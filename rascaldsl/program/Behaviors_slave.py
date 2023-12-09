@@ -68,7 +68,7 @@ class UpdateSlaveReadings(Behavior):
         msg = str(self.readings_dict['touch_left']) + "," + str(self.readings_dict['touch_right']) + "," + str(self.readings_dict['touch_back']) + "," + str(self.readings_dict['ult_front'])
         log = "Sending Readings: " + msg
         timedlog(log)
-        self.bluetooth_connection.send_data(msg)
+        self.bluetooth_connection.write(msg)
         
         time.sleep(0.05)
 

@@ -46,7 +46,7 @@ timedlog("Starting")
 ##### GENERATED CODE GOES HERE #####
 
 controller.add(EdgeAvoidanceBhv(cs_l, cs_m, cs_r, us_b, motor, leds, s))
-controller.add(RunningBhv(motor, leds, s))
+controller.add(RunningBhv(motor, leds))
 
 
 ##### GENERATED CODE GOES HERE #####

@@ -140,6 +140,7 @@ class EdgeAvoidanceBhv(Behavior):
         # if all([left, right, back]):  # left and right sensors on the edge and back cliff (stuck everywhere)
             # return []
         if all([left, right]):  # left and right sensors on the edge
+            random_choice = random.choice(['LEFT', 'RIGHT'])
             return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=random_choice, degrees=90)]
         
         if all([left, mid, back]):  # left and mid sensors on the edge and back cliff
@@ -161,6 +162,12 @@ class EdgeAvoidanceBhv(Behavior):
             return [lambda: self.motor.turn(direction=LEFT, degrees=45)]
         if right:  # right sensor on the edge
             return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=RIGHT, degrees=100)]
+        
+        timedlog("color sensor left: " + str(left))
+        timedlog("color sensor mid: " + str(mid))
+        timedlog("color sensor right: " + str(right))
+        timedlog("ultrasonic back: " + str(back))
+
 
     def action(self):
         """
@@ -174,7 +181,7 @@ class EdgeAvoidanceBhv(Behavior):
         if self.sound:
             self.sound.beep()
 
-        for operation in self._get_operations(self.edge["left"], self.edge["right"], self.edge["mid"], self.back_cliff):
+        for operation in self._get_operations(self.edge["left"], self.edge["mid"], self.edge["right"], self.back_cliff):
             operation()
             while self.motor.is_running and not self.supressed:
                 pass
