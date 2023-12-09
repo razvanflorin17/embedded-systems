@@ -27,10 +27,11 @@ controller = Controller(return_when_no_action=True)
 
 my_display = Display()
 
-master_mac = '78:DB:2F:29:F0:39'
-master = False
+master_mac = '00:17:E9:B2:6C:86'
+master = True
 
 # bluetooth_connection = BluetoothConnection(master, master_mac, debug=True)
+# readings_dict = {"touch_left": False, "touch_right": False, "touch_back": False, "ult_front": 0}
 
 # task_registry = TaskRegistry()
 
@@ -46,6 +47,9 @@ timedlog("Starting")
 ##### GENERATED CODE GOES HERE #####
 
 controller.add(EdgeAvoidanceBhv(cs_l, cs_m, cs_r, us_b, motor, leds, s))
+# controller.add(RecoverCollisionBhv(readings_dict, motor, leds, s))
+# controller.add(AvoidCollisionBhv(readings_dict, motor, leds, s))
+# controller.add(UpdateSlaveReadings(bluetooth_connection, readings_dict))
 controller.add(RunningBhv(motor, leds))
 
 

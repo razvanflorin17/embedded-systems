@@ -275,211 +275,188 @@ class UpdateSlaveReadings(Behavior):
 
 
 
-# class UltrasonicSensorBhv(Behavior):
-#     """
-#     This behavior will check if the ultrasonic sensor dedect an object, and makes the robot avoid it
-#     """
+class AvoidCollisionBhv(Behavior):
+    """
+    This behavior will check if the front ultrasonic sensor dedect an object, and makes the robot avoid it
+    """
         
-#     def __init__(self, ultrasonic_sensor, motor, leds=False, sound=False, threshold_distance=50):
-#         """
-#         Initialize the behavior
-#         @param ultrasonic_sensor: The ultrasonic sensor to use
-#         @param motor: the motor to use
-#         @param leds: the leds to use
-#         @param sound: the sound to use
+    def __init__(self, readings_dict, motor, leds=False, sound=False, threshold_distance=50):
+        """
+        Initialize the behavior
+        @param readings_dict: The readings dictionary to use for the ultrasonic front and touch back
+        @param motor: the motor to use
+        @param leds: the leds to use
+        @param sound: the sound to use
 
-#         """
-#         Behavior.__init__(self)
-#         self.supressed = False
-#         ultrasonic_sensor.mode = 'US-DIST-CM'
-#         self.ultrasonic_sensor = ultrasonic_sensor
-#         self.motor = motor
-#         self.leds = leds
-#         self.sound = sound
-#         self.threshold_distance = threshold_distance
-#         self.object_detected = False
+        """
+        Behavior.__init__(self)
+        self.supressed = False
+        self.motor = motor
+        self.leds = leds
+        self.sound = sound
+        self.threshold_distance = threshold_distance        
+
+        self.readings_dict = readings_dict
+        self.obj_front = False
 
     
-#     def check(self):
-#         """
-#         Check if the ultrasonic sensor dedect an object
-#         @return: True if the ultrasonic sensor dedect an object
-#         @rtype: bool
-#         """
+    def check(self):
+        """
+        Check if the ultrasonic sensor dedect an object
+        @return: True if the ultrasonic sensor dedect an object
+        @rtype: bool
+        """
         
-#         object_detected = read_ultrasonic_sensor(self.ultrasonic_sensor) < self.threshold_distance
+        obj_front = self.readings_dict["ult_front"] < self.threshold_distance
 
-#         if object_detected != self.object_detected:
-#             self.object_detected = object_detected
-#             return object_detected
-#         return False
+        if obj_front != self.obj_front:
+            self.obj_front = obj_front
+            return obj_front
+        return False
         
 
-#     def action(self):
-#         """
-#         Change direction to step away from the object
-#         """
-
-#         self.suppressed = False
-#         timedlog("Collision avoidance")
-#         if self.leds:
-#             set_leds_color(self.leds, "ORANGE")
-#         if self.sound:
-#             self.sound.beep()
-#             self.sound.beep()
+    def _get_operations(self, obj_front):
+        random_choice = random.choice(['LEFT', 'RIGHT'])
+        if obj_front:
+            return [lambda: self.motor.turn(direction=random_choice, degrees=45)]
+            
         
-#         for operation in self._get_operations(self.edge["left"], self.edge["mid"], self.edge["right"], self.back_cliff):
-#             operation()
-#             while self.motor.is_running and not self.supressed:
-#                 pass
-#             if self.supressed:
-#                 break
+    def action(self):
+        """
+        Change direction to step away from the object
+        """
 
-#         while self.motor.is_running and not self.suppressed:
-#             pass
-#         if not self.suppressed:
-#             return True
-#         else:
-#             timedlog("Collision avoidance suppressed")
-#             return False
+        self.suppressed = False
+        timedlog("Collision avoidance")
+        if self.leds:
+            set_leds_color(self.leds, "ORANGE")
+        if self.sound:
+            self.sound.beep()
+            self.sound.beep()
+        
+        for operation in self._get_operations(self.obj_front):
+            operation()
+            while self.motor.is_running and not self.supressed:
+                pass
+            if self.supressed:
+                break
+
+        while self.motor.is_running and not self.suppressed:
+            pass
+        if not self.suppressed:
+            return True
+        else:
+            timedlog("Collision avoidance suppressed")
+            return False
 
 
-#     def suppress(self):
-#         """
-#         Suppress the behavior
-#         """
-#         self.motor.stop()
-#         self.suppressed = True
+    def suppress(self):
+        """
+        Suppress the behavior
+        """
+        self.motor.stop()
+        self.suppressed = True
 
 
-# # class ReceiveTouchSensorBhv(Behavior):
-#     """
-#     This behavior will check if the robot has recived a reading from the touch sensors
-#     This behavior is istantaneous, so the supress method doesn't make sense
-#     """
 
-#     def __init__(self, motor, bluetooth_connection, leds=False, sound=False):
-#         """
-#         Initialize the behavior
-#         @param motor: the motor to use
-#         @param bluetooth_connection: The bluetooth connection to use
-#         @param leds: the leds to use
-#         @param sound: the sound to use
- 
-#         """
-#         Behavior.__init__(self)
-#         self.motor = motor
-#         self.bluetooth_connection = bluetooth_connection
-#         self.leds = leds
-#         self.sound = sound
-#         self.direction = None
-#         self.collision_data = self.bluetooth_connection.get_data().split(" ")
+class RecoverCollisionBhv(Behavior):
+    """
+    This behavior will check if we had collide with something, and makes the robot recover from it
+    """
+        
+    def __init__(self, readings_dict, motor, leds=False, sound=False):
+        """
+        Initialize the behavior
+        @param readings_dict: The readings dictionary to use for the touch sensors left and right and touch back
+        @param motor: the motor to use
+        @param leds: the leds to use
+        @param sound: the sound to use
+
+        """
+        Behavior.__init__(self)
+        self.supressed = False
+        self.motor = motor
+        self.leds = leds
+        self.sound = sound       
+
+        self.readings_dict = readings_dict
+
+        self.obj_left = False
+        self.obj_right = False
+        self.obj_back = False
 
     
-#     def check(self):
-#         """
-#         Check if the bluetooth connection has recived a new reading
-#         @return: True if the bluetooth connection has recived a new reading
-#         @rtype: bool
-#         """
-#         if self.collision_data:
-#             if self.collision_data[0] == "TOUCH":
-#                 if self.collision_data[1] == "LEFT":
-#                     self.direction = 45
-#                 elif self.collision_data[1] == "RIGHT":
-#                     self.direction = -45
-#                 else:
-#                     self.direction = 0
-#             self.collision_data = self.bluetooth_connection.get_data()
-#             return True
+    def check(self):
+        """
+        Check if the ultrasonic sensor dedect an object
+        @return: True if the ultrasonic sensor dedect an object
+        @rtype: bool
+        """
+        
+        obj_left = self.readings_dict["touch_left"]
+        obj_right = self.readings_dict["touch_right"]
+        obj_back = self.readings_dict["touch_back"]
 
-#         return False
+
+        if obj_left != self.obj_left or obj_right != self.obj_right or obj_back != self.obj_back:
+            self.obj_left = obj_left
+            self.obj_right = obj_right
+            self.obj_back = obj_back
+            return any([obj_left, obj_right, obj_back])
+        return False
         
 
-#     def action(self):
-#         """
-#         Avoid obstacle
-#         """
-#         timedlog("Collision detected by other brick: " + self.collision_data)
-#         if self.leds:
-#             set_leds_color(self.leds, 'RED')
-#         if self.sound:
-#             self.sound.beep()
-#             self.sound.beep()
+    def _get_operations(self, obj_left, obj_right, obj_back):
+        random_choice = random.choice(['LEFT', 'RIGHT'])
 
-#         if self.direction:
-#             self.motor.stop()
-#             self.motor.turn(direction=self.direction)
+        # if all([obj_left, obj_right, obj_back]): # stuck position
+            # return []
+        if all([obj_left, obj_right]): # left and right sensors touched
+            return []
+        if all([obj_left, obj_back]): # left and back sensors touched
+            return []
+        if all([obj_right, obj_back]): # right and back sensors touched
+            return []
+        if obj_left: # left sensor touched
+            return [lambda: self.motor.turn(direction=RIGHT, degrees=45)]
+        if obj_right: # right sensor touched
+            return [lambda: self.motor.turn(direction=LEFT, degrees=45)]
+        if obj_back: # back sensor touched
+            return [lambda: self.motor.run(forward=True, distance=5), lambda: self.motor.turn(direction=random_choice, degrees=15)]
+            
 
-#         return True
+    def action(self):
+        """
+        Change direction to step away from the object
+        """
 
-
-#     def suppress(self):
-#         """
-#         This behavior is istantaneous, so the supress method doesn't make sense
-#         """
-#         pass
-
-
-
-# class ReceiveUltrasonicSensorBhv(Behavior):
-#     """
-#     This behavior will check if the robot has recived a reading from the ulstrasonic sensor
-#     This behavior is istantaneous, so the supress method doesn't make sense
-#     """
-
-#     def __init__(self, motor, bluetooth_connection, leds=False, sound=False):
-#         """
-#         Initialize the behavior
-#         @param motor: the motor to use
-#         @param bluetooth_connection: The bluetooth connection to use
-#         @param leds: the leds to use
-#         @param sound: the sound to use
- 
-#         """
-#         Behavior.__init__(self)
-#         self.motor = motor
-#         self.bluetooth_connection = bluetooth_connection
-#         self.leds = leds
-#         self.sound = sound
-#         self.direction = None
-#         self.collision_data = self.bluetooth_connection.get_data().split(" ")
-
-    
-#     def check(self):
-#         """
-#         Check if the bluetooth connection has recived a new reading
-#         @return: True if the bluetooth connection has recived a new reading
-#         @rtype: bool
-#         """
-#         if self.collision_data:
-#             self.direction = 45
-#             self.collision_data = self.bluetooth_connection.get_data()
-#             return True
-
-#         return False
+        self.suppressed = False
+        timedlog("Collision recover")
+        if self.leds:
+            set_leds_color(self.leds, "ORANGE")
+        if self.sound:
+            self.sound.beep()
+            self.sound.beep()
         
+        for operation in self._get_operations(self.obj_left, self.obj_right, self.obj_back):
+            operation()
+            while self.motor.is_running and not self.supressed:
+                pass
+            if self.supressed:
+                break
 
-#     def action(self):
-#         """
-#         Avoid obstacle
-#         """
-#         timedlog("Collision detected by other brick: " + self.collision_data)
-#         if self.leds:
-#             set_leds_color(self.leds, 'RED')
-#         if self.sound:
-#             self.sound.beep()
-#             self.sound.beep()
-
-#         if self.direction:
-#             self.motor.stop()
-#             self.motor.turn(direction=self.direction)
-
-#         return True
+        while self.motor.is_running and not self.suppressed:
+            pass
+        if not self.suppressed:
+            return True
+        else:
+            timedlog("Collision recover suppressed")
+            return False
 
 
-#     def suppress(self):
-#         """
-#         This behavior is istantaneous, so the supress method doesn't make sense
-#         """
-#         pass
+    def suppress(self):
+        """
+        Suppress the behavior
+        """
+        self.motor.stop()
+        self.suppressed = True
