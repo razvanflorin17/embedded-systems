@@ -1,0 +1,13 @@
+ta == COLOR mid black
+tb == COLOR left black
+tc == INDISTANCE front 10
+
+td == ta + tc + tb
+
+aa := FORWARD 10
+ab := TURN 90
+ac := BEEP
+
+ad := aa + ac
+
+Mission: td DO ad
