@@ -21,7 +21,7 @@ ts_l, ts_r, ts_b, us_f, s = TouchSensor(TS_L), TouchSensor(TS_R), TouchSensor(TS
 
 controller = Controller(return_when_no_action=True)
 
-master_mac = '78:DB:2F:29:F0:39'
+master_mac = '78:DB:2F:2B:5D:98'
 master = False
 
 bluetooth_connection = BluetoothConnection(master, master_mac, debug=True)

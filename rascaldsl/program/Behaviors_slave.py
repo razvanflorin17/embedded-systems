@@ -65,7 +65,7 @@ class UpdateSlaveReadings(Behavior):
         self.readings_dict["touch_back"] = self.touch_back.is_pressed
         self.readings_dict["ult_front"] = read_ultrasonic_sensor(self.ult_front)
 
-        msg = f"{self.readings_dict['touch_left']},{self.readings_dict['touch_right']},{self.readings_dict['touch_back']},{str(self.readings_dict['ult_front'])}"
+        msg = str(self.readings_dict['touch_left']) + "," + str(self.readings_dict['touch_right']) + "," + str(self.readings_dict['touch_back']) + "," + str(self.readings_dict['ult_front'])
         log = "Sending Readings: " + msg
         timedlog(log)
         self.bluetooth_connection.send_data(msg)

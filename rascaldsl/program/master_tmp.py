@@ -23,12 +23,12 @@ cs_l, cs_m, cs_r, us_b, move_differential, arm_steering, leds, s = ColorSensor(C
 motor = Motor(move_differential)
 arm = ArmMotor(arm_steering)
 
-controller = Controller(return_when_no_action=True)
+controller = Controller(return_when_no_action=False)
 
 my_display = Display()
 
-master_mac = '78:DB:2F:29:F0:39'
-master = False
+master_mac = '78:DB:2F:2B:5D:98'
+master = True
 
 bluetooth_connection = BluetoothConnection(master, master_mac, debug=True)
 readings_dict = {"touch_left": False, "touch_right": False, "touch_back": False, "ult_front": 0}

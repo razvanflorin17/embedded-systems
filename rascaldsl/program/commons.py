@@ -162,7 +162,7 @@ class BluetoothConnection():
         Starts the connection between the master and the slave.
         """
         if self.is_master:
-            self.server_sock.listen(1)
+            self.server_sock.listen(10)
             if self.debug:
                 timedlog('Listening for connections from the slave...')
 

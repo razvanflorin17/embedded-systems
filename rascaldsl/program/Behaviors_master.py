@@ -76,7 +76,7 @@ class EdgeAvoidanceBhv(Behavior):
     This behavior will check if the robot is on the black border, and tries to step away from it
     """
 
-    def __init__(self, left_cs, mid_cs, right_cs, back_ult, motor, leds=False, sound=False, heigth_treshold=50, edge_color="WHITE"):
+    def __init__(self, left_cs, mid_cs, right_cs, back_ult, motor, leds=False, sound=False, heigth_treshold=50, edge_color="white"):
         """
         Initialize the behavior
         @param left_cs: The left color sensor to use
@@ -112,10 +112,10 @@ class EdgeAvoidanceBhv(Behavior):
         @return: True if the color sensor is on a black surface
         @rtype: bool
         """
-        left_edge = read_color_sensor(self.left_cs) == self.edge_color  # note maybe we should check against the table color instead of the edge color
-        mid_edge = read_color_sensor(self.mid_cs) == self.edge_color
-        right_edge = read_color_sensor(self.right_cs) == self.edge_color
-        back_cliff = read_ultrasonic_sensor(self.back_ult) > self.heigth_treshold
+        left_edge = int2color(read_color_sensor(self.left_cs)) == self.edge_color  # note maybe we should check against the table color instead of the edge color
+        mid_edge = int2color(read_color_sensor(self.mid_cs)) == self.edge_color
+        right_edge = int2color(read_color_sensor(self.right_cs)) == self.edge_color
+        back_cliff = int2color(read_ultrasonic_sensor(self.back_ult)) > self.heigth_treshold
 
         if left_edge != self.edge["left"] or mid_edge != self.edge["mid"] or right_edge != self.edge["right"] or back_cliff != self.back_cliff:
             self.edge["left"] = left_edge
@@ -213,34 +213,43 @@ class UpdateSlaveReadings(Behavior):
         Behavior.__init__(self)
         self.bluetooth_connection = bluetooth_connection
         self.readings_dict = readings_dict
+        self.data = ""
 
         self.direction = None
 
     
     def check(self):
         """
-        Update the slave readings into the readings dictionary
+        Check if the bluetooth connection has recived a new reading
         @return: True if the bluetooth connection has recived a new reading
         @rtype: bool
         """
 
-        data = self.bluetooth_connection.get_data().split(",")
+
+        data = self.bluetooth_connection.get_data()
+        if self.data != data:
+            self.data = data
+            timedlog("Readings: " + self.data)
+            return True
+        
+        return False
+            
+    def action(self):
+        """
+        Update the readings dictionary with the new readings
+        """
+        
+        data = self.data.split(",")
+
         self.readings_dict["touch_left"] = bool(data[0])
         self.readings_dict["touch_right"] = bool(data[1])
         self.readings_dict["touch_back"] = bool(data[2])
         self.readings_dict["ult_front"] = int(data[3])
 
-        msg = f"{self.readings_dict['touch_left']},{self.readings_dict['touch_right']},{self.readings_dict['touch_back']},{str(self.readings_dict['ult_front'])}"
+        msg = str(self.readings_dict['touch_left']) + "," + str(self.readings_dict['touch_right']) + "," + str(self.readings_dict['touch_back']) + "," + str(self.readings_dict['ult_front'])
         log = "Readings: " + msg
         timedlog(log)
 
-        return False
-    
-    def action(self):
-        """
-        Change direction to step away from the object
-        """
-        pass
 
 
     def suppress(self):
