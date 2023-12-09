@@ -70,7 +70,7 @@ class UpdateSlaveReadings(Behavior):
         timedlog(log)
         self.bluetooth_connection.send_data(msg)
         
-        time.sleep(0.1)
+        time.sleep(0.05)
 
         return True
 

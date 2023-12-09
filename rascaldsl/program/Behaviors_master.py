@@ -112,10 +112,10 @@ class EdgeAvoidanceBhv(Behavior):
         @return: True if the color sensor is on a black surface
         @rtype: bool
         """
-        left_edge = int2color(read_color_sensor(self.left_cs)) == self.edge_color  # note maybe we should check against the table color instead of the edge color
-        mid_edge = int2color(read_color_sensor(self.mid_cs)) == self.edge_color
-        right_edge = int2color(read_color_sensor(self.right_cs)) == self.edge_color
-        back_cliff = int2color(read_ultrasonic_sensor(self.back_ult)) > self.heigth_treshold
+        left_edge = read_color_sensor(self.left_cs) == self.edge_color  # note maybe we should check against the table color instead of the edge color
+        mid_edge = read_color_sensor(self.mid_cs) == self.edge_color
+        right_edge = read_color_sensor(self.right_cs) == self.edge_color
+        back_cliff = read_ultrasonic_sensor(self.back_ult) > self.heigth_treshold
 
         if left_edge != self.edge["left"] or mid_edge != self.edge["mid"] or right_edge != self.edge["right"] or back_cliff != self.back_cliff:
             self.edge["left"] = left_edge
