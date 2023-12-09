@@ -71,6 +71,53 @@ class RunningBhv(Behavior):
         self.supressed = True
 
 
+class RunningTmpBhv(Behavior):
+    """
+    Default behavior that will run if no other behavior is running, to keep the robot moving while its completing tasks
+    """
+    
+    def __init__(self, motor, leds=False, task_registry=None):
+        """
+        Initialize the behavior
+        @param motor: the motor to use
+        @param leds: the leds to use
+        @param task_registry: the task registry to check
+        """
+        Behavior.__init__(self)
+        self.supressed = False
+        self.motor = motor
+        self.leds = leds
+        self.task_registry = task_registry
+
+    def check(self):
+        """
+        Always returns true if it has task to complete
+        @return: True
+        @rtype: bool
+        """
+        if self.task_registry is None:
+            return True
+
+        return not self.task_registry.tasks_done()
+
+    def action(self):
+        """
+        Keep the robot moving
+        """
+
+        self.supressed = False
+        return True
+
+
+    def suppress(self):
+        """
+        Suppress the behavior
+        """
+        self.motor.stop()
+        self.supressed = True
+
+
+
 class EdgeAvoidanceBhv(Behavior):
     """
     This behavior will check if the robot is on the black border, and tries to step away from it
@@ -234,7 +281,7 @@ class UpdateSlaveReadings(Behavior):
 
 
         data = self.bluetooth_connection.get_data()
-        if self.data != data:
+        if data != "" and self.data != data:
             self.data = data
             timedlog("Readings: " + self.data)
             return True
@@ -256,6 +303,8 @@ class UpdateSlaveReadings(Behavior):
         msg = str(self.readings_dict['touch_left']) + "," + str(self.readings_dict['touch_right']) + "," + str(self.readings_dict['touch_back']) + "," + str(self.readings_dict['ult_front'])
         log = "Readings: " + msg
         timedlog(log)
+
+        return True
 
 
 

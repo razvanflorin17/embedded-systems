@@ -23,11 +23,11 @@ cs_l, cs_m, cs_r, us_b, move_differential, arm_steering, leds, s = ColorSensor(C
 motor = Motor(move_differential)
 arm = ArmMotor(arm_steering)
 
-controller = Controller(return_when_no_action=False)
+controller = Controller(return_when_no_action=True)
 
 my_display = Display()
 
-master_mac = '78:DB:2F:2B:5D:98'
+master_mac = '00:17:E9:B2:6C:86'
 master = True
 
 bluetooth_connection = BluetoothConnection(master, master_mac, debug=True)
@@ -48,6 +48,8 @@ timedlog("Starting")
 
 
 controller.add(UpdateSlaveReadings(bluetooth_connection, readings_dict))
+controller.add(RunningTmpBhv(motor, leds))
+
 
 ##### GENERATED CODE GOES HERE #####
 ##### GENERATED CODE GOES HERE #####
@@ -57,7 +59,7 @@ controller.add(UpdateSlaveReadings(bluetooth_connection, readings_dict))
 
 
 
-# bluetooth_connection.start_listening(lambda data: ())
+bluetooth_connection.start_listening(lambda data: ())
 controller.start()
 
 s.speak("stop")
