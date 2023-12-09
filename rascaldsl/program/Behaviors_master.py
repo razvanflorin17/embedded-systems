@@ -71,52 +71,6 @@ class RunningBhv(Behavior):
         self.supressed = True
 
 
-class RunningTmpBhv(Behavior):
-    """
-    Default behavior that will run if no other behavior is running, to keep the robot moving while its completing tasks
-    """
-    
-    def __init__(self, motor, leds=False, task_registry=None):
-        """
-        Initialize the behavior
-        @param motor: the motor to use
-        @param leds: the leds to use
-        @param task_registry: the task registry to check
-        """
-        Behavior.__init__(self)
-        self.supressed = False
-        self.motor = motor
-        self.leds = leds
-        self.task_registry = task_registry
-
-    def check(self):
-        """
-        Always returns true if it has task to complete
-        @return: True
-        @rtype: bool
-        """
-        if self.task_registry is None:
-            return True
-
-        return not self.task_registry.tasks_done()
-
-    def action(self):
-        """
-        Keep the robot moving
-        """
-
-        self.supressed = False
-        return True
-
-
-    def suppress(self):
-        """
-        Suppress the behavior
-        """
-        self.motor.stop()
-        self.supressed = True
-
-
 
 class EdgeAvoidanceBhv(Behavior):
     """
@@ -169,7 +123,7 @@ class EdgeAvoidanceBhv(Behavior):
             self.edge["mid"] = mid_edge
             self.edge["right"] = right_edge
             self.back_cliff = back_cliff
-            return any([left_edge, mid_edge, right_edge]) # back_cliff is not a valid condition to fire, but it's used to decide how to move
+            return any([left_edge, mid_edge, right_edge, back_cliff])
 
         return False
     
@@ -208,8 +162,12 @@ class EdgeAvoidanceBhv(Behavior):
         if all([right, back]):  # right sensor on the edge and back cliff
             return [lambda: self.motor.turn(direction=LEFT, degrees=45)]
         if right:  # right sensor on the edge
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=RIGHT, degrees=100)]
+            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=LEFT, degrees=100)]
+        if back: # back cliff behind the robot
+            random_choice = random.choice(['LEFT', 'RIGHT'])
+            return [lambda: self.motor.turn(direction=random_choice, degrees=45), lambda: self.motor.run(forward=True, distance=5)]
         
+
         timedlog("color sensor left: " + str(left))
         timedlog("color sensor mid: " + str(mid))
         timedlog("color sensor right: " + str(right))
@@ -339,7 +297,7 @@ class UpdateSlaveReadings(Behavior):
 #         self.leds = leds
 #         self.sound = sound
 #         self.threshold_distance = threshold_distance
-#         self.object_detected = True
+#         self.object_detected = False
 
     
 #     def check(self):
@@ -363,8 +321,19 @@ class UpdateSlaveReadings(Behavior):
 #         """
 
 #         self.suppressed = False
+#         timedlog("Collision avoidance")
+#         if self.leds:
+#             set_leds_color(self.leds, "ORANGE")
+#         if self.sound:
+#             self.sound.beep()
+#             self.sound.beep()
         
-#         self.motor.turn(direction=45)
+#         for operation in self._get_operations(self.edge["left"], self.edge["mid"], self.edge["right"], self.back_cliff):
+#             operation()
+#             while self.motor.is_running and not self.supressed:
+#                 pass
+#             if self.supressed:
+#                 break
 
 #         while self.motor.is_running and not self.suppressed:
 #             pass
