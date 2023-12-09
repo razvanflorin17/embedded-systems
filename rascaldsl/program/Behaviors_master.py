@@ -102,7 +102,7 @@ class EdgeAvoidanceBhv(Behavior):
 
         self.edge = {"left": False, "mid": False, "right": False}
         self.back_cliff = False
-        self.edge_colors = edge_color
+        self.edge_color = edge_color
 
 
     
@@ -131,35 +131,36 @@ class EdgeAvoidanceBhv(Behavior):
         
         # [lambda: self.motor.turn(direction=45), lambda: self.motor.turn(direction=right, degrees=30)]  # tipical operations should be like this
 
-        if all([left, mid, right, back]):  # all sensors on the edge and back cliff (stuck everywhere)
-            return []
+        # if all([left, mid, right, back]):  # all sensors on the edge and back cliff (stuck everywhere)
+            # return []
         if all([left, mid, right]):  # all sensors on the edge
-            return []
+            random_choice = random.choice(['LEFT', 'RIGHT'])
+            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=random_choice, degrees=90)]
         
-        if all([left, right, back]):  # left and right sensors on the edge and back cliff (stuck everywhere)
-            return []
+        # if all([left, right, back]):  # left and right sensors on the edge and back cliff (stuck everywhere)
+            # return []
         if all([left, right]):  # left and right sensors on the edge
-            return []
+            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=random_choice, degrees=90)]
         
         if all([left, mid, back]):  # left and mid sensors on the edge and back cliff
-            return []
+            return [lambda: self.motor.turn(direction=RIGHT, degrees=45)]
         if all([left, mid]):  # left and mid sensors on the edge
-            return []
+            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=RIGHT, degrees=100)]
         
         if all([mid, right, back]):  # mid and right sensors on the edge and back cliff
-            return []
+            return [lambda: self.motor.turn(direction=LEFT, degrees=45)]
         if all([mid, right]):  # mid and right sensors on the edge
-            return []
+            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=LEFT, degrees=100)]
 
         if all([left, back]):  # left sensor on the edge and back cliff
-            return []
+            return [lambda: self.motor.turn(direction=RIGHT, degrees=45)]
         if left:  # left sensor on the edge
-            return []
+            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=RIGHT, degrees=100)]
         
         if all([right, back]):  # right sensor on the edge and back cliff
-            return []        
+            return [lambda: self.motor.turn(direction=LEFT, degrees=45)]
         if right:  # right sensor on the edge
-            return []
+            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=RIGHT, degrees=100)]
 
     def action(self):
         """
@@ -202,32 +203,52 @@ class UpdateSlaveReadings(Behavior):
     """
         
    
-    def __init__(self, bluetooth_connection):
+    def __init__(self, bluetooth_connection, readings_dict):
         """
         Initialize the behavior
-        @param bluetooth_connection: The bluetooth connection to use
-
- 
+        @param bluetooth_connection: The bluetooth connection to useù
+        @param readings_dict: The readings dictionary to update
+        
         """
         Behavior.__init__(self)
         self.bluetooth_connection = bluetooth_connection
+        self.readings_dict = readings_dict
 
         self.direction = None
-        self.collision_data = self.bluetooth_connection.get_data().split(" ")
 
     
     def check(self):
         """
-        Check if the bluetooth connection has recived a new reading
+        Update the slave readings into the readings dictionary
         @return: True if the bluetooth connection has recived a new reading
         @rtype: bool
         """
-        if self.collision_data:
-            self.direction = 45
-            self.collision_data = self.bluetooth_connection.get_data()
-            return True
+
+        data = self.bluetooth_connection.get_data().split(",")
+        self.readings_dict["touch_left"] = bool(data[0])
+        self.readings_dict["touch_right"] = bool(data[1])
+        self.readings_dict["touch_back"] = bool(data[2])
+        self.readings_dict["ult_front"] = int(data[3])
+
+        msg = f"{self.readings_dict['touch_left']},{self.readings_dict['touch_right']},{self.readings_dict['touch_back']},{str(self.readings_dict['ult_front'])}"
+        log = "Readings: " + msg
+        timedlog(log)
 
         return False
+    
+    def action(self):
+        """
+        Change direction to step away from the object
+        """
+        pass
+
+
+    def suppress(self):
+        """
+        Suppress the behavior
+        """
+        pass
+
 
 
 
@@ -367,64 +388,64 @@ class UpdateSlaveReadings(Behavior):
 
 
 
-class ReceiveUltrasonicSensorBhv(Behavior):
-    """
-    This behavior will check if the robot has recived a reading from the ulstrasonic sensor
-    This behavior is istantaneous, so the supress method doesn't make sense
-    """
+# class ReceiveUltrasonicSensorBhv(Behavior):
+#     """
+#     This behavior will check if the robot has recived a reading from the ulstrasonic sensor
+#     This behavior is istantaneous, so the supress method doesn't make sense
+#     """
 
-    def __init__(self, motor, bluetooth_connection, leds=False, sound=False):
-        """
-        Initialize the behavior
-        @param motor: the motor to use
-        @param bluetooth_connection: The bluetooth connection to use
-        @param leds: the leds to use
-        @param sound: the sound to use
+#     def __init__(self, motor, bluetooth_connection, leds=False, sound=False):
+#         """
+#         Initialize the behavior
+#         @param motor: the motor to use
+#         @param bluetooth_connection: The bluetooth connection to use
+#         @param leds: the leds to use
+#         @param sound: the sound to use
  
-        """
-        Behavior.__init__(self)
-        self.motor = motor
-        self.bluetooth_connection = bluetooth_connection
-        self.leds = leds
-        self.sound = sound
-        self.direction = None
-        self.collision_data = self.bluetooth_connection.get_data().split(" ")
+#         """
+#         Behavior.__init__(self)
+#         self.motor = motor
+#         self.bluetooth_connection = bluetooth_connection
+#         self.leds = leds
+#         self.sound = sound
+#         self.direction = None
+#         self.collision_data = self.bluetooth_connection.get_data().split(" ")
 
     
-    def check(self):
-        """
-        Check if the bluetooth connection has recived a new reading
-        @return: True if the bluetooth connection has recived a new reading
-        @rtype: bool
-        """
-        if self.collision_data:
-            self.direction = 45
-            self.collision_data = self.bluetooth_connection.get_data()
-            return True
+#     def check(self):
+#         """
+#         Check if the bluetooth connection has recived a new reading
+#         @return: True if the bluetooth connection has recived a new reading
+#         @rtype: bool
+#         """
+#         if self.collision_data:
+#             self.direction = 45
+#             self.collision_data = self.bluetooth_connection.get_data()
+#             return True
 
-        return False
+#         return False
         
 
-    def action(self):
-        """
-        Avoid obstacle
-        """
-        timedlog("Collision detected by other brick: " + self.collision_data)
-        if self.leds:
-            set_leds_color(self.leds, 'RED')
-        if self.sound:
-            self.sound.beep()
-            self.sound.beep()
+#     def action(self):
+#         """
+#         Avoid obstacle
+#         """
+#         timedlog("Collision detected by other brick: " + self.collision_data)
+#         if self.leds:
+#             set_leds_color(self.leds, 'RED')
+#         if self.sound:
+#             self.sound.beep()
+#             self.sound.beep()
 
-        if self.direction:
-            self.motor.stop()
-            self.motor.turn(direction=self.direction)
+#         if self.direction:
+#             self.motor.stop()
+#             self.motor.turn(direction=self.direction)
 
-        return True
+#         return True
 
 
-    def suppress(self):
-        """
-        This behavior is istantaneous, so the supress method doesn't make sense
-        """
-        pass
+#     def suppress(self):
+#         """
+#         This behavior is istantaneous, so the supress method doesn't make sense
+#         """
+#         pass
