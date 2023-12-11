@@ -20,6 +20,7 @@ public TModel modulesTModelFromTree(Tree pt) {
 data IdRole 
      = triggerId()
      | actionId()
+     | behaviorId()
 ;
 
 data AType 
@@ -31,6 +32,7 @@ data AType
      | turnActionType()
      | speakActionType()
      | ledActionType()
+     | behaviorType()
 ;
 
 // ADT definitions
@@ -46,6 +48,8 @@ data TurnAction = turnAction(int angle = 0);
 data SpeakAction = speakAction(str text = "");
 data LedAction = ledAction(str color = "");
 
+data Behavior = behavior(list[loc] triggerList = [], list[loc] actionList = []);
+
 // ADT constructors
 
 data DefInfo(list[ColorTrigger] colorTrigger = []);
@@ -59,6 +63,7 @@ data DefInfo(list[TurnAction] turnAction = []);
 data DefInfo(list[SpeakAction] speakAction = []);
 data DefInfo(list[LedAction] ledAction = []);
 
+data DefInfo(list[Behavior] behavior = []);
 
 //   TypePalConfig
 
@@ -101,8 +106,9 @@ private TypePalConfig getModulesConfig() = tconfig(
 
 // helper methods
 
-void checkIdList(current, Solver s, idCheckList, list[AType] validTypes) {
+void checkIdList(current, Solver s, idCheckList, list[AType] validTypes, list[str] excludedIds) {
      for (<id> <- {<id> |/(ID) `<ID id>` := idCheckList}) {
+          s.requireFalse(("<id>" in excludedIds), error(current, "%t is excluded", id));
           s.requireTrue((s.getType(id) in validTypes), error(current,  "type should be one of %v, instead of %t", validTypes, id));
      }
 }
@@ -170,7 +176,8 @@ void collect(current: (Trigger) `<ID idNew> <TriggerAssignment triggerAssignment
 
      c.calculate("trigger idList assignment", current, [idNew, idTriggerList],
           AType (Solver s) { 
-               checkIdList(current, s, idTriggerList, [colorTriggerType(), distanceTriggerType(), touchTriggerType()]);
+               checkIdList(current, s, idTriggerList, 
+               [colorTriggerType(), distanceTriggerType(), touchTriggerType(), idListType()], [<"idNew">]);
                return idListType();
      });
 }
@@ -254,7 +261,8 @@ void collect(current: (Action) `<ID idNew> <ActionAssignment actionAssignment> <
 
      c.calculate("trigger idList assignment", current, [idNew, idActionList],
           AType (Solver s) { 
-               checkIdList(current, s, idActionList, [moveActionType(), speakActionType(), ledActionType()]);
+               checkIdList(current, s, idActionList, 
+               [moveActionType(), speakActionType(), ledActionType(), idListType()], [<"idNew">]);
                return idListType();
      });
 }

@@ -3,6 +3,7 @@ tb == COLOR left black
 tc == INDISTANCE front 10
 
 td == ta + tc + tb
+tt == td + tt
 
 aa := FORWARD 10
 ab := TURN 90

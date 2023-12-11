@@ -14,8 +14,8 @@ start syntax Planning
 ;
 
 syntax Mission
-    // = newSingle: "Mission:" ID task "WHILE" (ID | IDList) behaviors
-    // | newMulti: "Mission:" ListMod listMod IDList taskList "WHILE" (ID | IDList) behaviors
+    // = newSingle: "Mission:" STR name ID task "WHILE" (ID | IDList) behaviors
+    // | newMulti: "Mission:" STR name ListMod listMod IDList taskList "WHILE" (ID | IDList) behaviors
     = tmp: "Mission:" ID trigger "DO" ID action
 ;
 

@@ -8,7 +8,7 @@ import bluetooth, threading
 
 
 SOUND_NO_BLOCK = Sound.PLAY_NO_WAIT_FOR_COMPLETE # sound option that doesn't block the program
-BASE_SPEED = 15
+BASE_SPEED = 25
 LEFT, RIGHT = -1, 1
 BLACK = 1
 

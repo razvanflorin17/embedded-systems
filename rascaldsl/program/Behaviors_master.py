@@ -52,7 +52,7 @@ class RunningBhv(Behavior):
         timedlog("Moving")
         if self.leds:
             set_leds_color(self.leds, "GREEN")
-        self.motor.run()
+        self.motor.run(distance=30)
 
         while self.motor.is_running and not self.supressed:
             pass
@@ -104,6 +104,7 @@ class EdgeAvoidanceBhv(Behavior):
         self.edge = {"left": False, "mid": False, "right": False}
         self.back_cliff = False
         self.edge_color = edge_color
+        self.operations = []
 
 
     
@@ -123,7 +124,11 @@ class EdgeAvoidanceBhv(Behavior):
             self.edge["mid"] = mid_edge
             self.edge["right"] = right_edge
             self.back_cliff = back_cliff
-            return any([left_edge, mid_edge, right_edge, back_cliff])
+
+            
+            if any([left_edge, mid_edge, right_edge, back_cliff]):
+                self.operations = self._get_operations(left_edge, mid_edge, right_edge, back_cliff)
+                return True
 
         return False
     
@@ -133,34 +138,38 @@ class EdgeAvoidanceBhv(Behavior):
 
         if all([left, mid, right]):  # all sensors on the edge
             random_choice = random.choice(['LEFT', 'RIGHT'])
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=random_choice, degrees=90)]
+            return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=random_choice, degrees=45)]
         
         if all([left, right]):  # left and right sensors on the edge
             random_choice = random.choice(['LEFT', 'RIGHT'])
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=random_choice, degrees=90)]
+            return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=random_choice, degrees=45)]
         
         if all([left, mid, back]):  # left and mid sensors on the edge and back cliff
             return [lambda: self.motor.turn(direction=RIGHT, degrees=45)]
         if all([left, mid]):  # left and mid sensors on the edge
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=RIGHT, degrees=100)]
+            return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=RIGHT, degrees=45)]
         
         if all([mid, right, back]):  # mid and right sensors on the edge and back cliff
             return [lambda: self.motor.turn(direction=LEFT, degrees=45)]
         if all([mid, right]):  # mid and right sensors on the edge
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=LEFT, degrees=100)]
+            return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=LEFT, degrees=45)]
 
         if all([left, back]):  # left sensor on the edge and back cliff
             return [lambda: self.motor.turn(direction=RIGHT, degrees=45)]
         if left:  # left sensor on the edge
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=RIGHT, degrees=100)]
+            return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=RIGHT, degrees=45)]
         
         if all([right, back]):  # right sensor on the edge and back cliff
             return [lambda: self.motor.turn(direction=LEFT, degrees=45)]
         if right:  # right sensor on the edge
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=LEFT, degrees=100)]
+            return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=LEFT, degrees=45)]
         if back: # back cliff behind the robot
             random_choice = random.choice(['LEFT', 'RIGHT'])
             return [lambda: self.motor.turn(direction=random_choice, degrees=45), lambda: self.motor.run(forward=True, distance=5)]
+
+        timedlog("Edge sensors: " + str(left) + " " + str(mid) + " " + str(right) + " " + str(back))
+
+        return []
 
 
     def action(self):
@@ -168,6 +177,7 @@ class EdgeAvoidanceBhv(Behavior):
         Change direction to step away from the border
         """
 
+        # operations = self._get_operations(self.edge["left"], self.edge["mid"], self.edge["right"], self.back_cliff)
         self.supressed = False
         timedlog("Edge collision")
         if self.leds:
@@ -175,7 +185,7 @@ class EdgeAvoidanceBhv(Behavior):
         if self.sound:
             self.sound.beep()
 
-        for operation in self._get_operations(self.edge["left"], self.edge["mid"], self.edge["right"], self.back_cliff):
+        for operation in self.operations:
             operation()
             while self.motor.is_running and not self.supressed:
                 pass
@@ -202,13 +212,12 @@ class LakeAvoidanceBhv(Behavior):
     This behavior will check if the robot is on a lake, and tries to step away from it
     """
 
-    def __init__(self, left_cs, mid_cs, right_cs, back_ult, motor, leds=False, sound=False, heigth_treshold=50, lake_colors=["yellow", "blue", "red"]):
+    def __init__(self, left_cs, mid_cs, right_cs, motor, leds=False, sound=False, heigth_treshold=50, lake_colors=["yellow", "blue", "red"]):
         """
         Initialize the behavior
         @param left_cs: The left color sensor to use
         @param mid_cs: The middle color sensor to use
         @param right_cs: The right color sensor to use
-        @param back_ult: The back ultrasonic sensor to use
         @param motor: the motor to use
         @param leds: the leds to use
         @param sound: the sound to use
@@ -220,15 +229,14 @@ class LakeAvoidanceBhv(Behavior):
         self.left_cs = left_cs
         self.mid_cs = mid_cs
         self.right_cs = right_cs
-        self.back_ult = back_ult
         self.motor = motor
         self.leds = leds
         self.sound = sound
         self.heigth_treshold = heigth_treshold        
 
         self.edge = {"left": False, "mid": False, "right": False}
-        self.back_cliff = False
         self.lake_colors = lake_colors
+        self.operations = []
 
 
     
@@ -241,57 +249,47 @@ class LakeAvoidanceBhv(Behavior):
         left_edge = read_color_sensor(self.left_cs) in self.lake_colors  # note maybe we should check against the table color instead of the edge color
         mid_edge = read_color_sensor(self.mid_cs) in self.lake_colors
         right_edge = read_color_sensor(self.right_cs) in self.lake_colors
-        back_cliff = read_ultrasonic_sensor(self.back_ult) > self.heigth_treshold
 
-        if left_edge != self.edge["left"] or mid_edge != self.edge["mid"] or right_edge != self.edge["right"] or back_cliff != self.back_cliff:
+        if left_edge != self.edge["left"] or mid_edge != self.edge["mid"] or right_edge != self.edge["right"]:
             self.edge["left"] = left_edge
             self.edge["mid"] = mid_edge
             self.edge["right"] = right_edge
-            self.back_cliff = back_cliff
-            return any([left_edge, mid_edge, right_edge, back_cliff])
+            
+            if any([left_edge, mid_edge, right_edge]):
+                self.operations = self._get_operations(left_edge, mid_edge, right_edge)
+                return True
 
         return False
     
 
-    def _get_operations(self, left, mid, right, back):
+    def _get_operations(self, left, mid, right):
         
-        if all([left, mid, right]):  # all sensors on the edge
-            random_choice = random.choice(['LEFT', 'RIGHT'])
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=random_choice, degrees=90)]
-        
-        if all([left, right]):  # left and right sensors on the edge
-            random_choice = random.choice(['LEFT', 'RIGHT'])
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=random_choice, degrees=90)]
-        
-        if all([left, mid, back]):  # left and mid sensors on the edge and back cliff
-            return [lambda: self.motor.turn(direction=RIGHT, degrees=45)]
         if all([left, mid]):  # left and mid sensors on the edge
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=RIGHT, degrees=100)]
-        
-        if all([mid, right, back]):  # mid and right sensors on the edge and back cliff
-            return [lambda: self.motor.turn(direction=LEFT, degrees=45)]
+            return [lambda: self.motor.turn(direction=RIGHT, degrees=60)]
+    
         if all([mid, right]):  # mid and right sensors on the edge
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=LEFT, degrees=100)]
+            return [lambda: self.motor.turn(direction=LEFT, degrees=60)]
 
-        if all([left, back]):  # left sensor on the edge and back cliff
-            return [lambda: self.motor.turn(direction=RIGHT, degrees=45)]
         if left:  # left sensor on the edge
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=RIGHT, degrees=100)]
-        
-        if all([right, back]):  # right sensor on the edge and back cliff
-            return [lambda: self.motor.turn(direction=LEFT, degrees=45)]
-        if right:  # right sensor on the edge
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(direction=LEFT, degrees=100)]
-        if back: # back cliff behind the robot
-            random_choice = random.choice(['LEFT', 'RIGHT'])
-            return [lambda: self.motor.turn(direction=random_choice, degrees=45), lambda: self.motor.run(forward=True, distance=5)]
+            return [lambda: self.motor.turn(direction=RIGHT, degrees=15)]
 
+        if right:  # right sensor on the edge
+            return [lambda: self.motor.turn(direction=LEFT, degrees=15)]
+        
+        if mid:  # left sensor on the edge
+            random_choice = random.choice(['LEFT', 'RIGHT'])
+            return [lambda: self.motor.turn(direction=random_choice, degrees=60)]
+
+        timedlog("Lake sensors: " + str(left) + " " + str(mid) + " " + str(right) + " ")
+
+        return []
 
     def action(self):
         """
         Change direction to step away from the border
         """
 
+        # operations = self._get_operations(self.edge["left"], self.edge["mid"], self.edge["right"])
         self.supressed = False
         timedlog("Lake collision")
         if self.leds:
@@ -299,7 +297,7 @@ class LakeAvoidanceBhv(Behavior):
         if self.sound:
             self.sound.beep()
 
-        for operation in self._get_operations(self.edge["left"], self.edge["mid"], self.edge["right"], self.back_cliff):
+        for operation in self.operations:
             operation()
             while self.motor.is_running and not self.supressed:
                 pass
@@ -349,20 +347,14 @@ class UpdateSlaveReadings(Behavior):
         @rtype: bool
         """
 
-
         data = self.bluetooth_connection.get_data()
         if data != "" and self.data != data:
             self.data = data
-            timedlog("Readings: " + self.data)
-            return True
+            self._update_readings_dict()
         
         return False
-            
-    def action(self):
-        """
-        Update the readings dictionary with the new readings
-        """
-        
+    
+    def _update_readings_dict(self):
         data = self.data.split(",")
 
         self.readings_dict["touch_left"] = bool(data[0])
@@ -370,10 +362,13 @@ class UpdateSlaveReadings(Behavior):
         self.readings_dict["touch_back"] = bool(data[2])
         self.readings_dict["ult_front"] = int(data[3])
 
-        msg = str(self.readings_dict['touch_left']) + "," + str(self.readings_dict['touch_right']) + "," + str(self.readings_dict['touch_back']) + "," + str(self.readings_dict['ult_front'])
-        log = "Readings: " + msg
+        log = "Readings: " + str(self.readings_dict['touch_left']) + "," + str(self.readings_dict['touch_right']) + "," + str(self.readings_dict['touch_back']) + "," + str(self.readings_dict['ult_front'])
         timedlog(log)
-
+            
+    def action(self):
+        """
+        Do nothing
+        """
         return True
 
 
@@ -392,7 +387,7 @@ class AvoidCollisionBhv(Behavior):
     This behavior will check if the front ultrasonic sensor dedect an object, and makes the robot avoid it
     """
         
-    def __init__(self, readings_dict, motor, leds=False, sound=False, threshold_distance=50):
+    def __init__(self, readings_dict, motor, leds=False, sound=False, threshold_distance=150):
         """
         Initialize the behavior
         @param readings_dict: The readings dictionary to use for the ultrasonic front and touch back
@@ -410,6 +405,7 @@ class AvoidCollisionBhv(Behavior):
 
         self.readings_dict = readings_dict
         self.obj_front = False
+        self.operations = []
 
     
     def check(self):
@@ -423,7 +419,10 @@ class AvoidCollisionBhv(Behavior):
 
         if obj_front != self.obj_front:
             self.obj_front = obj_front
-            return obj_front
+
+            if obj_front:
+                self.operations = self._get_operations(obj_front)
+                return True
         return False
         
 
@@ -446,7 +445,7 @@ class AvoidCollisionBhv(Behavior):
             self.sound.beep()
             self.sound.beep()
         
-        for operation in self._get_operations(self.obj_front):
+        for operation in self.operations:
             operation()
             while self.motor.is_running and not self.supressed:
                 pass
@@ -492,6 +491,8 @@ class RecoverCollisionBhv(Behavior):
         self.sound = sound       
 
         self.readings_dict = readings_dict
+        self.operations = []
+
 
         self.obj_left = False
         self.obj_right = False
@@ -514,7 +515,11 @@ class RecoverCollisionBhv(Behavior):
             self.obj_left = obj_left
             self.obj_right = obj_right
             self.obj_back = obj_back
-            return any([obj_left, obj_right, obj_back])
+            
+            if any([obj_left, obj_right, obj_back]):
+                self.operations = self._get_operations(obj_left, obj_right, obj_back)
+                return True
+
         return False
         
 
@@ -532,6 +537,7 @@ class RecoverCollisionBhv(Behavior):
             return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=LEFT, degrees=90)]
         if obj_back: # back sensor touched
             return [lambda: self.motor.run(forward=True, distance=5)]
+        
             
 
     def action(self):
@@ -547,7 +553,7 @@ class RecoverCollisionBhv(Behavior):
             self.sound.beep()
             self.sound.beep()
         
-        for operation in self._get_operations(self.obj_left, self.obj_right, self.obj_back):
+        for operation in self.operations:
             operation()
             while self.motor.is_running and not self.supressed:
                 pass

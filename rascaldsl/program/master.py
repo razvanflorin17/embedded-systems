@@ -27,11 +27,12 @@ controller = Controller(return_when_no_action=True)
 
 my_display = Display()
 
-master_mac = '00:17:E9:B2:6C:86'
+master_mac = '78:DB:2F:2B:5D:98'
 master = True
 
-# bluetooth_connection = BluetoothConnection(master, master_mac, debug=True)
-# readings_dict = {"touch_left": False, "touch_right": False, "touch_back": False, "ult_front": 0}
+bluetooth_connection = BluetoothConnection(master, master_mac, debug=True)
+s.speak("Nigger connected")
+readings_dict = {"touch_left": False, "touch_right": False, "touch_back": False, "ult_front": 0}
 
 # task_registry = TaskRegistry()
 
@@ -46,10 +47,11 @@ timedlog("Starting")
 ##### GENERATED CODE GOES HERE #####
 ##### GENERATED CODE GOES HERE #####
 
-controller.add(EdgeAvoidanceBhv(cs_l, cs_m, cs_r, us_b, motor, leds, s))
-# controller.add(RecoverCollisionBhv(readings_dict, motor, leds, s))
-# controller.add(AvoidCollisionBhv(readings_dict, motor, leds, s))
-# controller.add(UpdateSlaveReadings(bluetooth_connection, readings_dict))
+controller.add(UpdateSlaveReadings(bluetooth_connection, readings_dict))
+controller.add(EdgeAvoidanceBhv(cs_l, cs_m, cs_r, us_b, motor))
+controller.add(LakeAvoidanceBhv(cs_l, cs_m, cs_r, motor))
+controller.add(RecoverCollisionBhv(readings_dict, motor))
+controller.add(AvoidCollisionBhv(readings_dict, motor))
 controller.add(RunningBhv(motor, leds))
 
 
@@ -61,7 +63,7 @@ controller.add(RunningBhv(motor, leds))
 
 
 
-# bluetooth_connection.start_listening(lambda data: ())
+bluetooth_connection.start_listening(lambda data: ())
 controller.start()
 
 s.speak("stop")
