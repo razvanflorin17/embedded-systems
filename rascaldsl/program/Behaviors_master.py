@@ -412,17 +412,14 @@ class RecoverCollisionBhv(Behavior):
         # if all([obj_left, obj_right, obj_back]): # stuck position
             # return []
         if all([obj_left, obj_right]): # left and right sensors touched
-            return []
-        if all([obj_left, obj_back]): # left and back sensors touched
-            return []
-        if all([obj_right, obj_back]): # right and back sensors touched
-            return []
+            random_choice = random.choice(['LEFT', 'RIGHT'])
+            return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=random_choice, degrees=90)]
         if obj_left: # left sensor touched
-            return [lambda: self.motor.turn(direction=RIGHT, degrees=45)]
+            return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=RIGHT, degrees=90)]
         if obj_right: # right sensor touched
-            return [lambda: self.motor.turn(direction=LEFT, degrees=45)]
+            return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=LEFT, degrees=90)]
         if obj_back: # back sensor touched
-            return [lambda: self.motor.run(forward=True, distance=5), lambda: self.motor.turn(direction=random_choice, degrees=15)]
+            return [lambda: self.motor.run(forward=True, distance=5)]
             
 
     def action(self):
