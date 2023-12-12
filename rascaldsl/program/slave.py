@@ -18,10 +18,11 @@ if DEBUG:
 TS_L, TS_R, TS_B, US_F, LEFT, RIGHT = INPUT_1, INPUT_2, INPUT_3, INPUT_4, -1, 1
 
 ts_l, ts_r, ts_b, us_f, s = TouchSensor(TS_L), TouchSensor(TS_R), TouchSensor(TS_B), UltrasonicSensor(US_F), Sound()
+us_f.mode = 'US-DIST-CM'
 
 controller = Controller(return_when_no_action=True)
 
-master_mac = '00:17:E9:B2:1E:41'
+master_mac = '78:DB:2F:2B:5D:98'
 master = False
 
 bluetooth_connection = BluetoothConnection(master, master_mac, debug=DEBUG)

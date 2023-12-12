@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-DEBUG = True
+DEBUG = False
 if DEBUG:
     from ev3devlogging import timedlog
 import random
@@ -54,7 +54,7 @@ class Motor():
         self.motor = motor
         self.base_speed = base_speed
 
-    def run(self, forward=True, distance=10, speed=None, speedM=None, block=False, brake=True):
+    def run(self, forward=True, distance=10, speed=None, speedM=None, block=False, brake=False):
         """Runs the motor for a certain distance (cm)"""
         if speedM is None:
             speedM = 1 if forward else 0.5
@@ -68,18 +68,18 @@ class Motor():
 
 
 
-    def turn(self, direction=None, degrees=180, speed=None, speedM=0.5, block=False):
+    def turn(self, direction=None, degrees=180, speed=None, speedM=0.5, block=False, brake=False):
         if speed is None:
             speed = self.base_speed * speedM
 
         if direction == None:
             random_direction = random.choice([LEFT, RIGHT])
-            self.turn(random_direction, degrees, speed, speedM, block)
+            self.turn(direction=random_direction, degrees=degrees, speed=speed, speedM=speedM, block=block, brake=brake)
         
         elif direction == RIGHT:
-            self.motor.turn_right(SpeedPercent(speed), degrees, block=block)
+            self.motor.turn_right(SpeedPercent(speed), degrees, block=block, brake=brake)
         else:
-            self.motor.turn_left(SpeedPercent(speed), degrees, block=block)
+            self.motor.turn_left(SpeedPercent(speed), degrees, block=block, brake=brake)
 
 
     def stop(self):
@@ -168,7 +168,7 @@ class BluetoothConnection():
         if self.is_master:
             self.server_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
             self.server_sock.bind((self.server_mac, self.port))
-            self.server_sock.listen(10)
+            self.server_sock.listen(20)
             
             if self.debug:
                 timedlog('Listening for connections from the slave...')
@@ -179,7 +179,7 @@ class BluetoothConnection():
             self.client_sock = client_sock
 
         else:
-            time.sleep(3)
+            time.sleep(6)
             self.client_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
             if self.debug:
                 timedlog("Connecting to the master...")
