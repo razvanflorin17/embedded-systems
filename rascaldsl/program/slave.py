@@ -28,7 +28,7 @@ bluetooth_connection = BluetoothConnection(master, master_mac, debug=DEBUG)
 readings_dict = {"touch_left": False, "touch_right": False, "touch_back": False, "ult_front": 0}
 
 
-controller.add(UpdateSlaveReadings(ts_l, ts_r, ts_b, us_f, bluetooth_connection, readings_dict))
+controller.add(UpdateSlaveReadingsBhv(ts_l, ts_r, ts_b, us_f, bluetooth_connection, readings_dict))
 
 
 

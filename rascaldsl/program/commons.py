@@ -10,7 +10,7 @@ import bluetooth, threading, time
 
 
 SOUND_NO_BLOCK = Sound.PLAY_NO_WAIT_FOR_COMPLETE # sound option that doesn't block the program
-BASE_SPEED = 15
+BASE_SPEED = 20
 LEFT, RIGHT = -1, 1
 BLACK = 1
 
@@ -50,50 +50,31 @@ class Motor():
     Wrapper class for the differential motor, all beahviors should use this class to control the motor.
     In the future if we want to change the type of motor, we only have to change this class
     """
-    def __init__(self, motor, base_speed=BASE_SPEED, initial_momentum=1, momentum_step=0.20, momentum_min=1, momentum_max=1):
-    # def __init__(self, motor, base_speed=BASE_SPEED, initial_momentum=1.5, momentum_step=0.20, momentum_min=0.6, momentum_max=1.2):
+    def __init__(self, motor, base_speed=BASE_SPEED):
         self.motor = motor
         self.base_speed = base_speed
-        self.initial_momentum = initial_momentum
-        self.momentum = initial_momentum
-        self.momentum_step = momentum_step
-        self.momentum_min = momentum_min
-        self.momentum_max = momentum_max
-        self.next_momentum = min(self.momentum + 1.5 * self.momentum_step, self.momentum_max)
 
-    def run(self, forward=True, distance=10, speed=None, block=False, brake=True):
+    def run(self, forward=True, distance=10, speed=None, speedM=None, block=False, brake=True):
         """Runs the motor for a certain distance (cm)"""
+        if speedM is None:
+            speedM = 1 if forward else 0.5
         if speed is None:
-            speed = self.base_speed * self.momentum
-            if forward:
-                self.increase_momentum()
-
-
+            speed = self.base_speed * speedM
         if forward:
             self.motor.on_for_distance(SpeedPercent(speed), distance*10, block=block, brake=brake)
         else:
             self.motor.on_for_distance(SpeedPercent(-speed), distance*10, block=block, brake=brake)
 
-    def increase_momentum(self):
-        self.next_momentum = min(self.momentum + 1.5 * self.momentum_step, self.momentum_max)
-
-    def decrease_momentum(self):
-        self.next_momentum = max(self.momentum - self.momentum_step, self.momentum_min)
 
 
-    def apply_momentum(self):
-        self.momentum = self.next_momentum
 
-    def turn(self, direction=None, degrees=180, speed=None, block=False):
-        self.next_momentum = self.momentum
+    def turn(self, direction=None, degrees=180, speed=None, speedM=0.5, block=False):
         if speed is None:
-            speed = self.base_speed * self.momentum
-            self.decrease_momentum()
-            self.apply_momentum()
+            speed = self.base_speed * speedM
 
         if direction == None:
             random_direction = random.choice([LEFT, RIGHT])
-            self.turn(random_direction, degrees, speed, block)
+            self.turn(random_direction, degrees, speed, speedM, block)
         
         elif direction == RIGHT:
             self.motor.turn_right(SpeedPercent(speed), degrees, block=block)
@@ -177,13 +158,7 @@ class BluetoothConnection():
         self.port = port
         self.debug = debug
         self.buffer = [""] # buffer for the data that is received
-
-        if self.is_master:
-            self.server_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-            self.server_sock.bind((server_mac, port))
-        else:
-            self.client_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-
+        
         self.startup()
 
     def startup(self):
@@ -191,7 +166,10 @@ class BluetoothConnection():
         Starts the connection between the master and the slave.
         """
         if self.is_master:
+            self.server_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+            self.server_sock.bind((self.server_mac, self.port))
             self.server_sock.listen(10)
+            
             if self.debug:
                 timedlog('Listening for connections from the slave...')
 
@@ -201,16 +179,12 @@ class BluetoothConnection():
             self.client_sock = client_sock
 
         else:
+            time.sleep(3)
+            self.client_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
             if self.debug:
                 timedlog("Connecting to the master...")
-            try:
-                self.client_sock.connect((self.server_mac, self.port))
-            except:
-                if self.debug:
-                    timedlog("Connection failed, retrying...")
-                time.sleep(1)
-            
-                self.startup()
+
+            self.client_sock.connect((self.server_mac, self.port))
 
             
             if self.debug:

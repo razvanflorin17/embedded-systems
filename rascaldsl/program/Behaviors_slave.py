@@ -8,15 +8,17 @@ from ev3dev2.sound import Sound
 from ev3dev2.led import Leds
 from ev3dev2.sensor.lego import ColorSensor, TouchSensor, UltrasonicSensor
 from ev3dev2._platform.ev3 import INPUT_1, INPUT_2, INPUT_3, INPUT_4
+from ev3devlogging import timedlog
+
 import bluetooth, threading
 import time
+
 from Subs_arch import Behavior, Controller
 from commons import *
-if DEBUG:
-    from ev3devlogging import timedlog
 
 
-class UpdateSlaveReadings(Behavior):
+
+class UpdateSlaveReadingsBhv(Behavior):
     """
     This behavior will check if the robot touch an object, and tries to step away from it
     """
