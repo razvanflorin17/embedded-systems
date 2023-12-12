@@ -108,7 +108,7 @@ private TypePalConfig getModulesConfig() = tconfig(
 
 void checkIdList(current, Solver s, idCheckList, list[AType] validTypes, list[str] excludedIds) {
      for (<id> <- {<id> |/(ID) `<ID id>` := idCheckList}) {
-          s.requireFalse(("<id>" in excludedIds), error(current, "%t is excluded", id));
+          s.requireFalse(("<id>" in excludedIds), error(current, "%v is excluded", "<id>"));
           s.requireTrue((s.getType(id) in validTypes), error(current,  "type should be one of %v, instead of %t", validTypes, id));
      }
 }
@@ -177,7 +177,7 @@ void collect(current: (Trigger) `<ID idNew> <TriggerAssignment triggerAssignment
      c.calculate("trigger idList assignment", current, [idNew, idTriggerList],
           AType (Solver s) { 
                checkIdList(current, s, idTriggerList, 
-               [colorTriggerType(), distanceTriggerType(), touchTriggerType(), idListType()], [<"idNew">]);
+               [colorTriggerType(), distanceTriggerType(), touchTriggerType(), idListType()], ["<idNew>"]);
                return idListType();
      });
 }
@@ -262,7 +262,7 @@ void collect(current: (Action) `<ID idNew> <ActionAssignment actionAssignment> <
      c.calculate("trigger idList assignment", current, [idNew, idActionList],
           AType (Solver s) { 
                checkIdList(current, s, idActionList, 
-               [moveActionType(), speakActionType(), ledActionType(), idListType()], [<"idNew">]);
+               [moveActionType(), speakActionType(), ledActionType(), idListType()], ["<idNew>"]);
                return idListType();
      });
 }

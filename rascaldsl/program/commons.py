@@ -8,7 +8,7 @@ import bluetooth, threading
 
 
 SOUND_NO_BLOCK = Sound.PLAY_NO_WAIT_FOR_COMPLETE # sound option that doesn't block the program
-BASE_SPEED = 25
+BASE_SPEED = 15
 LEFT, RIGHT = -1, 1
 BLACK = 1
 
@@ -48,30 +48,54 @@ class Motor():
     Wrapper class for the differential motor, all beahviors should use this class to control the motor.
     In the future if we want to change the type of motor, we only have to change this class
     """
-    def __init__(self, motor, base_speed=BASE_SPEED):
+    def __init__(self, motor, base_speed=BASE_SPEED, initial_momentum=1.5, momentum_step=0.20, momentum_min=0.6, momentum_max=1.4):
         self.motor = motor
         self.base_speed = base_speed
+        self.initial_momentum = initial_momentum
+        self.momentum = initial_momentum
+        self.momentum_step = momentum_step
+        self.momentum_min = momentum_min
+        self.momentum_max = momentum_max
+        self.next_momentum = self.momentum + self.momentum_step * 10
     
-    def run(self, forward=True, distance=10, speed=None, block=False):
+    def run(self, forward=True, distance=10, speed=None, block=False, brake=True):
         """Runs the motor for a certain distance (cm)"""
         if speed is None:
-            speed = self.base_speed
+            speed = self.base_speed * self.momentum
+            if forward:
+                self.next_momentum = min(self.momentum + 1.5 * self.momentum_step, self.momentum_max)
+
 
         if forward:
-            self.motor.on_for_distance(SpeedPercent(speed), distance*10, block=block)
+            self.motor.on_for_distance(SpeedPercent(speed), distance*10, block=block, brake=brake)
         else:
-            self.motor.on_for_distance(SpeedPercent(-speed), distance*10, block=block)
+            self.motor.on_for_distance(SpeedPercent(-speed), distance*10, block=block, brake=brake)
 
-    def turn(self, direction=RIGHT, degrees=180, speed=None, block=False):
+    def apply_momentum(self):
+        self.momentum = self.next_momentum
+
+    def turn(self, direction=None, degrees=180, speed=None, block=False):
+        self.next_momentum = self.momentum
         if speed is None:
-            speed = self.base_speed
+            speed = self.base_speed * self.momentum
+            self.momentum = max(self.momentum - self.momentum_step, self.momentum_min)
 
-        if direction == RIGHT:
+        if direction == None:
+            random_direction = random.choice([LEFT, RIGHT])
+            self.turn(random_direction, degrees, speed, block)
+        
+        elif direction == RIGHT:
             self.motor.turn_right(SpeedPercent(speed), degrees, block=block)
         else:
             self.motor.turn_left(SpeedPercent(speed), degrees, block=block)
 
 
+    def stop(self):
+        self.motor.stop()
+
+    @property
+    def is_running(self):
+        return self.motor.is_running
         
 # class Motor():
 #     """
@@ -99,12 +123,6 @@ class Motor():
     
     
 
-    def stop(self):
-        self.motor.stop()
-
-    @property
-    def is_running(self):
-        return self.motor.is_running
 
 
 class TaskRegistry():

@@ -32,7 +32,7 @@ master = True
 
 bluetooth_connection = BluetoothConnection(master, master_mac, debug=True)
 s.speak("Nigger connected")
-readings_dict = {"touch_left": False, "touch_right": False, "touch_back": False, "ult_front": 0}
+readings_dict = {"touch_left": False, "touch_right": False, "touch_back": False, "ult_front": 1000}
 
 # task_registry = TaskRegistry()
 
