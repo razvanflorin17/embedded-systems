@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
-DEBUG = False
+DEBUG = True
 if DEBUG:
     from ev3devlogging import timedlog
 import random
 from ev3dev2.motor import SpeedPercent
 from ev3dev2.sound import Sound
-import bluetooth, threading
+import bluetooth, threading, time
 
 
 SOUND_NO_BLOCK = Sound.PLAY_NO_WAIT_FOR_COMPLETE # sound option that doesn't block the program
@@ -206,7 +206,10 @@ class BluetoothConnection():
             try:
                 self.client_sock.connect((self.server_mac, self.port))
             except:
-                timedlog("Connection failed, retrying...")
+                if self.debug:
+                    timedlog("Connection failed, retrying...")
+                time.sleep(1)
+            
                 self.startup()
 
             
