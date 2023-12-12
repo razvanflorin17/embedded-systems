@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+DEBUG = False
+if DEBUG:
+    from ev3devlogging import timedlog
 import random
 from ev3dev2.motor import SpeedPercent
 from ev3dev2.sound import Sound
-from ev3devlogging import timedlog
 import bluetooth, threading
 
 
@@ -48,7 +50,8 @@ class Motor():
     Wrapper class for the differential motor, all beahviors should use this class to control the motor.
     In the future if we want to change the type of motor, we only have to change this class
     """
-    def __init__(self, motor, base_speed=BASE_SPEED, initial_momentum=1.5, momentum_step=0.20, momentum_min=0.6, momentum_max=1.4):
+    def __init__(self, motor, base_speed=BASE_SPEED, initial_momentum=1, momentum_step=0.20, momentum_min=1, momentum_max=1):
+    # def __init__(self, motor, base_speed=BASE_SPEED, initial_momentum=1.5, momentum_step=0.20, momentum_min=0.6, momentum_max=1.2):
         self.motor = motor
         self.base_speed = base_speed
         self.initial_momentum = initial_momentum
@@ -56,20 +59,27 @@ class Motor():
         self.momentum_step = momentum_step
         self.momentum_min = momentum_min
         self.momentum_max = momentum_max
-        self.next_momentum = self.momentum + self.momentum_step * 10
-    
+        self.next_momentum = min(self.momentum + 1.5 * self.momentum_step, self.momentum_max)
+
     def run(self, forward=True, distance=10, speed=None, block=False, brake=True):
         """Runs the motor for a certain distance (cm)"""
         if speed is None:
             speed = self.base_speed * self.momentum
             if forward:
-                self.next_momentum = min(self.momentum + 1.5 * self.momentum_step, self.momentum_max)
+                self.increase_momentum()
 
 
         if forward:
             self.motor.on_for_distance(SpeedPercent(speed), distance*10, block=block, brake=brake)
         else:
             self.motor.on_for_distance(SpeedPercent(-speed), distance*10, block=block, brake=brake)
+
+    def increase_momentum(self):
+        self.next_momentum = min(self.momentum + 1.5 * self.momentum_step, self.momentum_max)
+
+    def decrease_momentum(self):
+        self.next_momentum = max(self.momentum - self.momentum_step, self.momentum_min)
+
 
     def apply_momentum(self):
         self.momentum = self.next_momentum
@@ -78,7 +88,8 @@ class Motor():
         self.next_momentum = self.momentum
         if speed is None:
             speed = self.base_speed * self.momentum
-            self.momentum = max(self.momentum - self.momentum_step, self.momentum_min)
+            self.decrease_momentum()
+            self.apply_momentum()
 
         if direction == None:
             random_direction = random.choice([LEFT, RIGHT])
@@ -192,7 +203,13 @@ class BluetoothConnection():
         else:
             if self.debug:
                 timedlog("Connecting to the master...")
-            self.client_sock.connect((self.server_mac, self.port))
+            try:
+                self.client_sock.connect((self.server_mac, self.port))
+            except:
+                timedlog("Connection failed, retrying...")
+                self.startup()
+
+            
             if self.debug:
                 timedlog("Connected to the master")
         
@@ -253,7 +270,7 @@ class BluetoothConnection():
             self.server_sock.close()
 
 
-def read_color_sensor(cs):
+def read_color_sensor(cs):  
     """
     Reads the color sensor and returns the color that was read.
     @param color_sensor: The color sensor to read
@@ -262,7 +279,8 @@ def read_color_sensor(cs):
     try:
         color = cs.color
     except: 
-        timedlog("Color sensor wrong read")
+        if DEBUG:
+            timedlog("Color sensor wrong read")
         return read_color_sensor(cs)
     return int2color(color)
 
@@ -275,7 +293,8 @@ def read_ultrasonic_sensor(ultrasonic_sensor):
     try:
         distance = ultrasonic_sensor.value()
     except: 
-        timedlog("Ultrasonic sensor wrong read")
+        if DEBUG:
+            timedlog("Ultrasonic sensor wrong read")
         return read_ultrasonic_sensor(ultrasonic_sensor)
     return distance
 
@@ -288,6 +307,7 @@ def read_touch_sensor(touch_sensor):
     try:
         touch = touch_sensor.is_pressed
     except: 
-        timedlog("Touch sensor wrong read")
+        if DEBUG:
+            timedlog("Touch sensor wrong read")
         return read_touch_sensor(touch_sensor)
     return touch

@@ -9,12 +9,11 @@ from ev3dev2.sound import Sound
 from ev3dev2.led import Leds
 from ev3dev2.sensor.lego import ColorSensor, TouchSensor, UltrasonicSensor
 from ev3dev2._platform.ev3 import INPUT_1, INPUT_2, INPUT_3, INPUT_4
-from ev3devlogging import timedlog
-
 import bluetooth, threading
-
 from commons import *
 from Behaviors_master import *
+if DEBUG:
+    from ev3devlogging import timedlog
 
 CS_L, CS_M, CS_R, US_B, M_L, M_R, M_A, LEFT, RIGHT = INPUT_1, INPUT_2, INPUT_3, INPUT_4, OUTPUT_A, OUTPUT_B, OUTPUT_C, -1, 1
 
@@ -27,17 +26,18 @@ controller = Controller(return_when_no_action=True)
 
 my_display = Display()
 
-master_mac = '78:DB:2F:2B:5D:98'
+master_mac = '00:17:E9:B2:1E:41'
 master = True
 
-bluetooth_connection = BluetoothConnection(master, master_mac, debug=True)
+bluetooth_connection = BluetoothConnection(master, master_mac, debug=DEBUG)
 s.speak("Nigger connected")
 readings_dict = {"touch_left": False, "touch_right": False, "touch_back": False, "ult_front": 1000}
 
 # task_registry = TaskRegistry()
 
 s.speak('Start')
-timedlog("Starting")
+if DEBUG:
+    timedlog("Starting")
 
 
 

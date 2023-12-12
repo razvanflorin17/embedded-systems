@@ -8,14 +8,12 @@ from ev3dev2.sound import Sound
 from ev3dev2.led import Leds
 from ev3dev2.sensor.lego import ColorSensor, TouchSensor, UltrasonicSensor
 from ev3dev2._platform.ev3 import INPUT_1, INPUT_2, INPUT_3, INPUT_4
-from ev3devlogging import timedlog
-
 import bluetooth, threading
 import time
-
 from Subs_arch import Behavior, Controller
 from commons import *
-
+if DEBUG:
+    from ev3devlogging import timedlog
 
 
 class UpdateSlaveReadings(Behavior):
@@ -67,7 +65,8 @@ class UpdateSlaveReadings(Behavior):
 
         msg = str(self.readings_dict['touch_left']) + "," + str(self.readings_dict['touch_right']) + "," + str(self.readings_dict['touch_back']) + "," + str(self.readings_dict['ult_front'])
         log = "Sending Readings: " + msg
-        timedlog(log)
+        if DEBUG:
+            timedlog(log)
         self.bluetooth_connection.write(msg)
         
         time.sleep(0.05)

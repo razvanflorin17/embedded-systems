@@ -6,13 +6,11 @@ from ev3dev2.sound import Sound
 from ev3dev2.led import Leds
 from ev3dev2.sensor.lego import ColorSensor, TouchSensor, UltrasonicSensor
 from ev3dev2._platform.ev3 import INPUT_1, INPUT_2, INPUT_3, INPUT_4
-from ev3devlogging import timedlog
-
 import bluetooth, threading
-
 from Subs_arch import Behavior, Controller
 from commons import *
-
+if DEBUG:
+    from ev3devlogging import timedlog
 
 class RunningBhv(Behavior):
     """
@@ -49,20 +47,28 @@ class RunningBhv(Behavior):
         """
 
         self.supressed = False
-        timedlog("Moving")
+        if DEBUG:
+            timedlog("Moving")
         if self.leds:
             set_leds_color(self.leds, "GREEN")
         
+        # while not self.supressed:
+        #     self.motor.run(forward=True, distance=10, brake=False)
+        #     while self.motor.is_running and not self.supressed:
+        #         pass
+        #     if not self.supressed:
+        #         self.motor.apply_momentum()
+
         while not self.supressed:
-            self.motor.run(forward=True, distance=10, brake=False)
+            self.motor.run(forward=True, distance=1000, brake=False)
             while self.motor.is_running and not self.supressed:
                 pass
-            if not self.supressed:
-                self.motor.apply_momentum()
+
         if not self.supressed:
             return True
         else:
-            timedlog("Moving suppressed")
+            if DEBUG:
+                timedlog("Moving suppressed")
             return False
 
     def suppress(self):
@@ -166,9 +172,10 @@ class EdgeAvoidanceBhv(Behavior):
         if right:  # right sensor on the edge
             return [lambda: self.motor.run(forward=False, distance=2), lambda: self.motor.turn(direction=LEFT, degrees=45)]
         if back: # back cliff behind the robot
-            return [lambda: self.motor.turn(degrees=45), lambda: self.motor.run(forward=True, distance=5)]
+            return [lambda: self.motor.turn(degrees=30), lambda: self.motor.run(forward=True, distance=5)]
 
-        timedlog("Edge sensors: " + str(left) + " " + str(mid) + " " + str(right) + " " + str(back))
+        if DEBUG:
+            timedlog("Edge sensors: " + str(left) + " " + str(mid) + " " + str(right) + " " + str(back))
 
         return []
 
@@ -180,7 +187,8 @@ class EdgeAvoidanceBhv(Behavior):
 
         # operations = self._get_operations(self.edge["left"], self.edge["mid"], self.edge["right"], self.back_cliff)
         self.supressed = False
-        timedlog("Edge collision")
+        if DEBUG:
+            timedlog("Edge collision")
         if self.leds:
             set_leds_color(self.leds, "BLACK")
         if self.sound:
@@ -196,7 +204,8 @@ class EdgeAvoidanceBhv(Behavior):
         if not self.supressed:
             return True
         else:
-            timedlog("Edge collision suppressed")
+            if DEBUG:
+                timedlog("Edge collision suppressed")
             return False
 
 
@@ -266,21 +275,34 @@ class LakeAvoidanceBhv(Behavior):
     def _get_operations(self, left, mid, right):
         
         if all([left, mid]):  # left and mid sensors on the edge
-            return [lambda: self.motor.turn(direction=LEFT, degrees=45)]
+            # return [lambda: self.motor.turn(direction=LEFT, degrees=45)]
+            return [lambda: self.motor.run(forward=False, distance=2), lambda: self.motor.turn(direction=LEFT, degrees=30)]
+            # return [lambda: self.motor.turn(direction=LEFT, degrees=30)]
+            # return [lambda: self.motor.run(forward=False, distance=2), lambda: self.motor.turn(direction=LEFT, degrees=30), lambda: self.motor.run(forward=True, distance=12)]
+
     
         if all([mid, right]):  # mid and right sensors on the edge
-            return [lambda: self.motor.turn(direction=RIGHT, degrees=45)]
+            # return [lambda: self.motor.turn(direction=RIGHT, degrees=45)]
+            return [lambda: self.motor.run(forward=False, distance=2), lambda: self.motor.turn(direction=RIGHT, degrees=30)]
+            # return [lambda: self.motor.turn(direction=RIGHT, degrees=30)]
+            # return [lambda: self.motor.run(forward=False, distance=2), lambda: self.motor.turn(direction=RIGHT, degrees=30), lambda: self.motor.run(forward=True, distance=12)]
+
+        
 
         if left:  # left sensor on the edge
             return [lambda: self.motor.turn(direction=RIGHT, degrees=10)]
+            # return [lambda: self.motor.turn(direction=RIGHT, degrees=10), lambda: self.motor.run(forward=True, distance=5)]
 
         if right:  # right sensor on the edge
             return [lambda: self.motor.turn(direction=LEFT, degrees=10)]
+            # return [lambda: self.motor.turn(direction=LEFT, degrees=10), lambda: self.motor.run(forward=True, distance=5)]
+        
         
         if mid:  # left sensor on the edge
             return [lambda: self.motor.turn(degrees=60)]
 
-        timedlog("Lake sensors: " + str(left) + " " + str(mid) + " " + str(right) + " ")
+        if DEBUG:
+            timedlog("Lake sensors: " + str(left) + " " + str(mid) + " " + str(right) + " ")
 
         return []
 
@@ -291,7 +313,8 @@ class LakeAvoidanceBhv(Behavior):
 
         # operations = self._get_operations(self.edge["left"], self.edge["mid"], self.edge["right"])
         self.supressed = False
-        timedlog("Lake collision")
+        if DEBUG:
+            timedlog("Lake collision")
         if self.leds:
             set_leds_color(self.leds, "BLACK")
         if self.sound:
@@ -307,7 +330,8 @@ class LakeAvoidanceBhv(Behavior):
         if not self.supressed:
             return True
         else:
-            timedlog("Lake collision suppressed")
+            if DEBUG:
+                timedlog("Lake collision suppressed")
             return False
 
 
@@ -436,7 +460,8 @@ class AvoidCollisionBhv(Behavior):
         """
 
         self.suppressed = False
-        timedlog("Collision avoidance")
+        if DEBUG:
+            timedlog("Collision avoidance")
         if self.leds:
             set_leds_color(self.leds, "ORANGE")
         if self.sound:
@@ -455,7 +480,8 @@ class AvoidCollisionBhv(Behavior):
         if not self.suppressed:
             return True
         else:
-            timedlog("Collision avoidance suppressed")
+            if DEBUG:
+                timedlog("Collision avoidance suppressed")
             return False
 
 
@@ -541,7 +567,8 @@ class RecoverCollisionBhv(Behavior):
         """
 
         self.suppressed = False
-        timedlog("Collision recover")
+        if DEBUG:
+            timedlog("Collision recover")
         if self.leds:
             set_leds_color(self.leds, "ORANGE")
         if self.sound:
@@ -561,7 +588,8 @@ class RecoverCollisionBhv(Behavior):
         if not self.suppressed:
             return True
         else:
-            timedlog("Collision recover suppressed")
+            if DEBUG:
+                timedlog("Collision recover suppressed")
             return False
 
 

@@ -8,12 +8,12 @@ from ev3dev2.sound import Sound
 from ev3dev2.led import Leds
 from ev3dev2.sensor.lego import ColorSensor, TouchSensor, UltrasonicSensor
 from ev3dev2._platform.ev3 import INPUT_1, INPUT_2, INPUT_3, INPUT_4
-from ev3devlogging import timedlog
-
 import bluetooth, threading
 
 from commons import *
 from Behaviors_slave import *
+if DEBUG:
+    from ev3devlogging import timedlog
 
 TS_L, TS_R, TS_B, US_F, LEFT, RIGHT = INPUT_1, INPUT_2, INPUT_3, INPUT_4, -1, 1
 
@@ -21,10 +21,10 @@ ts_l, ts_r, ts_b, us_f, s = TouchSensor(TS_L), TouchSensor(TS_R), TouchSensor(TS
 
 controller = Controller(return_when_no_action=True)
 
-master_mac = '78:DB:2F:2B:5D:98'
+master_mac = '00:17:E9:B2:1E:41'
 master = False
 
-bluetooth_connection = BluetoothConnection(master, master_mac, debug=True)
+bluetooth_connection = BluetoothConnection(master, master_mac, debug=DEBUG)
 readings_dict = {"touch_left": False, "touch_right": False, "touch_back": False, "ult_front": 0}
 
 
@@ -33,7 +33,8 @@ controller.add(UpdateSlaveReadings(ts_l, ts_r, ts_b, us_f, bluetooth_connection,
 
 
 s.speak('Start')
-timedlog("Starting")
+if DEBUG:
+    timedlog("Starting")
 
 
 
