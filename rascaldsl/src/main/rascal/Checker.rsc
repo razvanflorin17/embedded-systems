@@ -21,6 +21,7 @@ data IdRole
      = triggerId()
      | actionId()
      | behaviorId()
+     | missionId()
 ;
 
 data AType 
@@ -33,6 +34,7 @@ data AType
      | speakActionType()
      | ledActionType()
      | behaviorType()
+     | missionType()
 ;
 
 // ADT definitions
@@ -48,7 +50,9 @@ data TurnAction = turnAction(int angle = 0);
 data SpeakAction = speakAction(str text = "");
 data LedAction = ledAction(str color = "");
 
-data Behavior = behavior(list[loc] triggerList = [], list[loc] actionList = []);
+data Behavior = behavior(list[loc] triggerList = [], list[loc] actionList = [], str triggerListMod="ALL");
+data Mission = mission(list[loc] taskList = [], list[loc] behaviorList = [], str taskListMod="ALL");
+
 
 // ADT constructors
 
@@ -64,27 +68,16 @@ data DefInfo(list[SpeakAction] speakAction = []);
 data DefInfo(list[LedAction] ledAction = []);
 
 data DefInfo(list[Behavior] behavior = []);
+data DefInfo(list[Mission] mission = []);
 
 //   TypePalConfig
 
-//todo: add feature to avoid use before definition
-
-// tuple[list[str] typeNames, set[IdRole] idRoles] triggerGetTypeNamesAndRole(str name){ //code for avoiding use before definition (trigger id)
-//     return <[name], {triggerId()}>;
-// }
-
-// default tuple[list[str] typeNames, set[IdRole] idRoles] triggerGetTypeNamesAndRole(AType t){
-//     return <[], {}>;
-// }
-
-// tuple[list[str] typeNames, set[IdRole] idRoles] actionGetTypeNamesAndRole(str name){ //code for avoiding use before definition (action id)
-//     return <[name], {actionId()}>;
-// }
-
-Accept myIsAcceptableSimple(loc def, Use use, Solver s) {
-     if (def.offset > use.occ.offset) {s.report(error(use, "use before definition"));}
+Accept isAcceptableSimple(loc def, Use use, Solver s) {
+     if (def.offset > use.occ.offset) {return ignoreSkipPath();}
      return acceptBinding();
 }
+
+
 
 bool idMayOverload (set[loc] defs, map[loc, Define] defines) { //code for uniques ids
     roles = {defines[def].idRole | def <- defs};
@@ -100,7 +93,7 @@ private TypePalConfig getModulesConfig() = tconfig(
      isSubType = subtype,
      // triggerGetTypeNamesAndRole = triggerGetTypeNamesAndRole,
      // actionGetTypeNamesAndRole = actionGetTypeNamesAndRole,
-     myIsAcceptableSimple = myIsAcceptableSimple,
+     isAcceptableSimple = isAcceptableSimple,
      idMayOverload = idMayOverload
 );
 
@@ -108,8 +101,8 @@ private TypePalConfig getModulesConfig() = tconfig(
 
 void checkIdList(current, Solver s, idCheckList, list[AType] validTypes, list[str] excludedIds) {
      for (<id> <- {<id> |/(ID) `<ID id>` := idCheckList}) {
-          s.requireFalse(("<id>" in excludedIds), error(current, "%v is excluded", "<id>"));
-          s.requireTrue((s.getType(id) in validTypes), error(current,  "type should be one of %v, instead of %t", validTypes, id));
+          s.requireFalse(("<id>" in excludedIds), error(id, "%v is excluded", "<id>"));
+          s.requireTrue((s.getType(id) in validTypes), error(id,  "type should be one of %v, instead of %t", validTypes, id));
      }
 }
 
@@ -262,24 +255,141 @@ void collect(current: (Action) `<ID idNew> <ActionAssignment actionAssignment> <
      c.calculate("trigger idList assignment", current, [idNew, idActionList],
           AType (Solver s) { 
                checkIdList(current, s, idActionList, 
-               [moveActionType(), speakActionType(), ledActionType(), idListType()], ["<idNew>"]);
+               [moveActionType(), turnActionType(), speakActionType(), ledActionType(), idListType()], ["<idNew>"]);
                return idListType();
      });
 }
 
-// tmp
 
-void collect(current: (Trigger) `<ID id>`,  Collector c) {
-     c.use(id, {triggerId()});
-}
 
-void collect(current: (Mission) `Mission: <ID idTrigger> DO <ID idAction>`,  Collector c) {
+// behavior
+
+//definitions
+// 1 trigger, 1 action
+void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ID idTrigger> DO <ID idAction>`,  Collector c) {
      c.use(idTrigger, {triggerId()});
      c.use(idAction, {actionId()});
+     dt = defType(behaviorType());
+     dt.behavior = [behavior(triggerList=[idTrigger.src], actionList=[idAction.src], triggerListMod="ALL")];
+     c.define("<idNew>", behaviorId(), idNew, dt);
+}
+
+// 1 trigger, n action
+void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ID idTrigger> DO <IDList idActions>`,  Collector c) {
+     c.use(idTrigger, {triggerId()});
+
+     actionList = collectIdList(c, idActions, actionId());
+     collect(idActions, c);
+     c.calculate("action idList check", current, [idActions],
+          AType (Solver s) { 
+               checkIdList(current, s, idActions, 
+               [moveActionType(), turnActionType(), touchTriggerType(), speakActionType(), ledActionType(), idListType()], []);
+               return idListType();
+     });
+
+     dt = defType(behaviorType());
+     dt.behavior = [behavior(triggerList=[idTrigger.src], actionList=actionList, triggerListMod="ALL")];
+     c.define("<idNew>", behaviorId(), idNew, dt);
+}
+
+// n trigger, 1 action
+void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ListMod listMod> <IDList idTriggers> DO <ID idAction>`,  Collector c) {
+     c.use(idAction, {actionId()});
+
+     triggerList = collectIdList(c, idTriggers, triggerId());
+     collect(idTriggers, c);
+     c.calculate("trigger idList check", current, [idTriggers],
+          AType (Solver s) { 
+               checkIdList(current, s, idTriggers, 
+               [colorTriggerType(), distanceTriggerType(), touchTriggerType(), idListType()], []);
+               return idListType();
+     });
+
+     dt = defType(behaviorType());
+     dt.behavior = [behavior(triggerList=triggerList, actionList=[idAction.src], triggerListMod="<listMod>")];
+     c.define("<idNew>", behaviorId(), idNew, dt);
+}
+
+// n trigger, n action
+void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ListMod listMod> <IDList idTriggers> DO <IDList idActions>`,  Collector c) {
+     actionList = collectIdList(c, idActions, actionId());
+     collect(idActions, c);
+     c.calculate("action idList check", current, [idActions],
+          AType (Solver s) { 
+               checkIdList(current, s, idActions, 
+               [moveActionType(), turnActionType(), touchTriggerType(), speakActionType(), ledActionType(), idListType()], []);
+               return idListType();
+     });
+
+     triggerList = collectIdList(c, idTriggers, triggerId());
+     collect(idTriggers, c);
+     c.calculate("trigger idList check", current, [idTriggers],
+          AType (Solver s) { 
+               checkIdList(current, s, idTriggers, 
+               [colorTriggerType(), distanceTriggerType(), touchTriggerType(), idListType()], []);
+               return idListType();
+     });
+
+     dt = defType(behaviorType());
+     dt.behavior = [behavior(triggerList=triggerList, actionList=actionList, triggerListMod="<listMod>")];
+     c.define("<idNew>", behaviorId(), idNew, dt);
 }
 
 
-void collect(current: (Action) `<ID id> <ActionAssignment actionAssignment>`,  Collector c) {
-     c.use(id, {actionId()});
+// mission
+
+//definitions
+// 1 trigger, 1 action
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <ID idTask> WHILE <ID idBhv>`,  Collector c) {
+     c.use(idTask, {triggerId()});
+     c.use(idBhv, {behaviorId()});
+     dt = defType(missionType());
+     dt.mission = [mission(taskList=[idTask.src], behaviorList=[idBhv.src], taskListMod="ALL")];
+     c.define("<idNew>", missionId(), idNew, dt);
 }
 
+// 1 trigger, n action
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <ID idTask> WHILE <IDList idBhvs>`,  Collector c) {
+     c.use(idTask, {triggerId()});
+
+     behaviorList = collectIdList(c, idBhvs, behaviorId());
+     collect(idBhvs, c);
+
+     dt = defType(missionType());
+     dt.mission = [mission(taskList=[idTask.src], behaviorList=behaviorList,  taskListMod="ALL")];
+     c.define("<idNew>", missionId(), idNew, dt);
+}
+
+// n trigger, 1 action
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <ListMod listMod> <IDList idTasks> WHILE <ID idBhv>`,  Collector c) {
+     c.use(idBhv, {behaviorId()});
+
+     taskList = collectIdList(c, idTasks, triggerId());
+     collect(idTasks, c);
+
+     dt = defType(missionType());
+     dt.mission = [mission(taskList=taskList, behaviorList=[idBhv.src], taskListMod="<listMod>")];
+     c.define("<idNew>", missionId(), idNew, dt);
+}
+
+// n trigger, n action
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <ListMod listMod> <IDList idTasks> WHILE <IDList idBhvs>`,  Collector c) {
+     behaviorList = collectIdList(c, idBhvs, behaviorId());
+     collect(idBhvs, c);
+
+     taskList = collectIdList(c, idTasks, triggerId());
+     collect(idTasks, c);
+
+     dt = defType(missionType());
+     dt.mission = [mission(taskList=taskList, behaviorList=behaviorList, taskListMod="<listMod>")];
+     c.define("<idNew>", missionId(), idNew, dt);
+}
+
+
+
+// Roverconfig
+
+void collect(current: (RoverConfig)`Rover: PERFORM <IDList missions> MAC: <STR macAddress>`, Collector c) {
+     collect(missions, c);
+     collectIdList(c, missions, missionId());
+}

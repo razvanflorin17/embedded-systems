@@ -5,6 +5,8 @@ import Set;
 import List;
 import String;
 import Location;
+import Set;
+import Map;
 
 import Syntax;
 import Parser;
@@ -17,11 +19,11 @@ void main() {
     println(rVal);
 }
 
-DefInfo findReferenceFromUse(tm, use) {
+DefInfo findReference(tm, use) {
     return findReferenceFromSrc(tm, use.src);
 }
 
-DefInfo findReferenceFromSrc(tm, src) {
+DefInfo findReferenceFromSrc(TModel tm, src) {
     defs = getUseDef(tm);
     if (def <- defs[src]) { 
         return tm.definitions[def].defInfo;
@@ -29,55 +31,111 @@ DefInfo findReferenceFromSrc(tm, src) {
     throw "Fix references in language instance";
 }
 
-str generator(cst) {
+str generator(cst) { // WIP
     tm = modulesTModelFromTree(cst);
-    rVal = "
-    '<tmp_print(cst, tm)>
-    '
-    '";
-    return rVal;
+    retVal = "";
+    if(/(RoverConfig) `Rover: PERFORM <IDList missions> MAC: <STR mac>` := cst) {
+        retVal = "
+        '<mac>
+        '
+        '<generateBhvsFromMissions(missions, tm)>
+        '
+        '
+        '<for (<mission> <- {<id> |/(ID) `<ID id>` := missions}) {>
+        '<mission>:<printMission(mission, tm)>
+        '<}>
+        '
+        '
+        '";
+    }
+
+    return retVal;
 }
 
 
+list[loc] extractBhvsToGenerate(missions, tm) {
+    bhvs = ();
+    for (<mission> <- {<id> |/(ID) `<ID id>` := missions}) {
+        DefInfo defInfo = findReference(tm, mission);
+        if (miss <- defInfo.mission) {
+            for (behavior <- miss.behaviorList) {
+                if(getContent(behavior) notin bhvs)
+                bhvs += (getContent(behavior): behavior);
+            }
+        }
+    }
+
+    return [bhvs[bhv] | bhv <- bhvs];
+}
+
+str generateBhvsFromMissions(missions, tm) {
+    bhvs = extractBhvsToGenerate(missions, tm);
+
+
+
+
+    // taskList = [];
+    //         for (task <- miss.taskList) {
+    //             taskList += generateTriggerFromId(tm, miss.taskListSrc);
+    //         }
+    //         if (miss.taskListMod != "ALLORD") { taskList = toList(toSet(taskList)); } // verify order
+
+    return intercalate("\n", bhvs);
+}
+
+// generateTriggerFromList(triggers, triggerListMod, tm) {
+// }
+
+
+str printMission(mission, tm) {
+    DefInfo defInfo = findReference(tm, mission);
+    retVal = ["CONTROLLER = Controller(return_when_no_action=True)"];
+    
+    if (miss <- defInfo.mission) {
+        retVal += "<miss>";
+    }
+
+    return intercalate("\n", retVal);
+}
 
 str tmp_print(ast, tm) {
     retVal = [];
-    for(<t, a> <- {<idTrigger, idAction> | /(Mission) `Mission: <ID idTrigger> DO <ID idAction>` := ast}) {
-        retVal += "<printTriggerFromId(tm, t.src)>";
-        retVal += "<printActionFromId(tm, a.src)>";
-    }
+    // for(<t, a> <- {<idTrigger, idAction> | /(Mission) `Mission: <ID idTrigger> DO <ID idAction>` := ast}) {
+    //     retVal += "<printTriggerFromId(tm, t.src)>";
+    //     retVal += "<printActionFromId(tm, a.src)>";
+    // }
     return intercalate("\n\n\n", retVal);
 }
 
-str printTriggerFromId(tm, startIdSrc) {
+list[str] generateTriggerFromId(tm, startIdSrc) {
     retVal = [];
     DefInfo defInfo = findReferenceFromSrc(tm, startIdSrc);
     if (l <- defInfo.idList) {
         for (idSrc <- l.idList) {
-            retVal += printTriggerFromId(tm, idSrc);
+            retVal += generateTriggerFromId(tm, idSrc);
         }
     }
-    else if (ct <- defInfo.colorTrigger) {retVal += "colorTrigger: <ct>"; }
-    else if (dt <- defInfo.distanceTrigger) {retVal += "distanceTrigger: <dt>"; }
-    else if (tt <- defInfo.touchTrigger) {retVal += "touchTrigger: <tt>"; }
+    else if (ct <- defInfo.colorTrigger) {retVal += "<ct>"; }
+    else if (dt <- defInfo.distanceTrigger) {retVal += "<dt>"; }
+    else if (tt <- defInfo.touchTrigger) {retVal += "<tt>"; }
 
-    return intercalate("\n", retVal);
+    return retVal;
 }
 
-str printActionFromId(tm, startIdSrc) {
+list[str] generateActionFromId(tm, startIdSrc) {
     retVal = [];
     DefInfo defInfo = findReferenceFromSrc(tm, startIdSrc);
     if (l <- defInfo.idList) {
         for (idSrc <- l.idList) {
-            retVal += printActionFromId(tm, idSrc);
+            retVal += generateActionFromId(tm, idSrc);
         }
     }
-    else if (ma <- defInfo.moveAction) {retVal += "moveAction: <ma>"; }
-    else if (ta <- defInfo.turnAction) {retVal += "turnAction: <ta>"; }
-    else if (sa <- defInfo.speakAction) {retVal += "speakAction: <sa>"; }
-    else if (la <- defInfo.ledAction) {retVal += "ledAction: <la>"; }
+    else if (ma <- defInfo.moveAction) {retVal += "<ma>"; }
+    else if (ta <- defInfo.turnAction) {retVal += "<ta>"; }
+    else if (sa <- defInfo.speakAction) {retVal += "<sa>"; }
+    else if (la <- defInfo.ledAction) {retVal += "<la>"; }
 
-    return intercalate("\n", retVal);
+    return retVal;
 }
 
 // str printTriggerIDList(idList) {

@@ -6,17 +6,17 @@ lexical WhitespaceAndComment = [\ \t\n\r] | @category="Comment" "#" ![\n]* $;
 // With references and TypePal
 
 start syntax Planning 
-    = planning:
-    Trigger+ triggers
-    Action* actions
-    Behavior* behaviors
-    Mission* missions
+    = planning: (Trigger | Action | Behavior | Mission)+ 
+    RoverConfig? roverConfig
+;
+
+syntax RoverConfig  //W.I.P.
+    = new: "Rover: PERFORM" IDList missions "MAC:" STR macAddress 
 ;
 
 syntax Mission
-    // = newSingle: "Mission:" STR name ID task "WHILE" (ID | IDList) behaviors
-    // | newMulti: "Mission:" STR name ListMod listMod IDList taskList "WHILE" (ID | IDList) behaviors
-    = tmp: "Mission:" ID trigger "DO" ID action
+    = newSingle: "Mission:" ID id "EXECUTE" ID task "WHILE" (ID | IDList) behaviors
+    | newMulti: "Mission:" ID id "EXECUTE" ListMod listMod IDList taskList "WHILE" (ID | IDList) behaviors
 ;
 
 syntax Behavior
@@ -27,7 +27,6 @@ syntax Behavior
 
 syntax Action
     = new: ID idNew ActionAssignment assignment RoverAction roverAction
-    | tmp: ID id ActionAssignment assignment
     // | newList: ID idNew ActionAssignment assignment '[' {RoverAction ','}+ ']' //not implemented
     // | copy: ID idNew ActionAssignment assignment ID idOld   // not implemented
     | copyList: ID idNew ActionAssignment assignment IDList idList
@@ -35,7 +34,6 @@ syntax Action
 
 syntax Trigger
     = new: ID idNew TriggerAssignment assignment RoverTrigger roverTrigger
-    | tmp: ID id
     // | newList: ID idNew TriggerAssignment assignment '[' {RoverTrigger ','}+ ']' // not implemented
     // | copy: ID idNew TriggerAssignment assignment ID idOld    // not implemented
     | copyList: ID idNew TriggerAssignment assignment IDList idList 
@@ -103,4 +101,4 @@ lexical ID = ([a-zA-Z/.\-][a-zA-Z0-9_/.]* !>> [a-zA-Z0-9_/.]) \ Reserved;
 lexical STR = "\"" ![\"\n]* "\"";
 
 keyword Reserved = "Mission:" | "Behavior:" | "WHEN" | "WHILE" | "DO" |"green" | "red" | "blue" | "black" | "yellow" | "amber" | "orange" 
-        | "FORWARD" | "BACKWARD" | "TURN" | "SPEAK" | "LED"| "BEEP" | "ANY" | "ALL" | "ALLORD" | ":" | "left" | "right" | "mid" | "back" | "front" ;
+        | "FORWARD" | "BACKWARD" | "TURN" | "SPEAK" | "LED"| "BEEP" | "ANY" | "ALL" | "ALLORD" | ":" | "left" | "right" | "mid" | "back" | "front" | "EXECUTE" | "PERFORM" | "MAC:" | "Rover:";
