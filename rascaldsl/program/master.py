@@ -30,7 +30,7 @@ my_display = Display()
 master_mac = '00:17:E9:B2:1E:41'
 master = True
 
-bluetooth_connection = BluetoothConnection(master, master_mac, debug=DEBUG)
+# bluetooth_connection = BluetoothConnection(master, master_mac, debug=DEBUG)
 
 readings_dict = {"touch_left": False, "touch_right": False, "touch_back": False, "ult_front": 1000}
 
@@ -48,12 +48,12 @@ if DEBUG:
 ##### GENERATED CODE GOES HERE #####
 ##### GENERATED CODE GOES HERE #####
 
-controller.add(UpdateSlaveReadings(bluetooth_connection, readings_dict))
+# controller.add(UpdateSlaveReadings(bluetooth_connection, readings_dict))
 controller.add(CliffAvoidanceBhv(us_b, motor))
 controller.add(EdgeAvoidanceBhv(cs_l, cs_m, cs_r, motor))
-controller.add(LakeAvoidanceBhv(cs_l, cs_m, cs_r, motor))
-controller.add(RecoverCollisionBhv(readings_dict, motor))
-controller.add(AvoidCollisionBhv(readings_dict, motor))
+controller.add(LakeAvoidanceBhv(cs_l, cs_m, cs_r, motor, arm, measure=True))
+# controller.add(RecoverCollisionBhv(readings_dict, motor))
+# controller.add(AvoidCollisionBhv(readings_dict, motor))
 controller.add(RunningBhv(motor, leds))
 
 
@@ -62,7 +62,7 @@ controller.add(RunningBhv(motor, leds))
 ##### GENERATED CODE GOES HERE #####
 
 
-bluetooth_connection.start_listening(lambda data: ())
+# bluetooth_connection.start_listening(lambda data: ())
 controller.start()
 
 s.speak("stop")
