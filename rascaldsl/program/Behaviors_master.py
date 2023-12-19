@@ -122,7 +122,7 @@ class CliffAvoidanceBhv(Behavior):
 
     def _get_operations(self, back):
         if back: # back cliff behind the robot
-            return [lambda: self.motor.turn(degrees=5), lambda: self.motor.run(forward=True, speedM=0.5, distance=5)]
+            return [lambda: self.motor.turn(degrees=5), lambda: self.motor.run(forward=True, speedM=0.5, distance=3)]
 
         if DEBUG:
             timedlog("Back sensors: " + str(back))
@@ -229,32 +229,32 @@ class EdgeAvoidanceBhv(Behavior):
     def _get_operations(self, left, mid, right):
         
         if all([left, mid, right]):  # all sensors on the edge
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(degrees=60)]
+            return [lambda: self.motor.run(forward=False, distance=4), lambda: self.motor.turn(degrees=60)]
         
         if all([left, right]):  # left and right sensors on the edge
-            return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(degrees=60)]
+            return [lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(degrees=60)]
         
         if all([left, mid]):  # left and mid sensors on the edge
-            return [lambda: self.motor.run(forward=False, distance=8), lambda: self.motor.turn(direction=RIGHT, degrees=30)]
+            return [lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(direction=RIGHT, degrees=30)]
         
         if all([mid, right]):  # mid and right sensors on the edge
-            return [lambda: self.motor.run(forward=False, distance=8), lambda: self.motor.turn(direction=LEFT, degrees=30)]
+            return [lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(direction=LEFT, degrees=30)]
 
         if left:  # left sensor on the edge
             if self.right_c == "black":
-                return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=RIGHT, degrees=30)]
+                return [lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(direction=RIGHT, degrees=30)]
             else:
                 return [lambda: self.motor.run(forward=True, speedM=0.5, distance=3), lambda: self.motor.turn(direction=RIGHT, degrees=20), lambda: self.motor.run(forward=False, distance=5)]
 
         if right:  # right sensor on the edge
             if self.left_c == "black":
-                return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=LEFT, degrees=30)]
+                return [lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(direction=LEFT, degrees=30)]
             else:
                 return [lambda: self.motor.run(forward=True, speedM=0.5, distance=3), lambda: self.motor.turn(direction=LEFT, degrees=20), lambda: self.motor.run(forward=False, distance=5)]
         
         if mid: # mid sensor on the edge
             direction = RIGHT if self.right_c == "black" else LEFT
-            return [lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(direction=direction, degrees=15)]
+            return [lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(direction=direction, degrees=30)]
 
 
         if DEBUG:
@@ -276,7 +276,7 @@ class EdgeAvoidanceBhv(Behavior):
         self.supressed = False
         if DEBUG:
             timedlog("Edge collision " + str(self.edge))
-        avoid_stuck = [lambda: self.motor.run(forward=False, distance=20), lambda: self.motor.turn(degrees=5)] if random.random() < 0.2 else []
+        avoid_stuck = [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(degrees=5)] if random.random() < 0.1 else []
         for operation in avoid_stuck + self.operations:
             operation()
             while self.motor.is_running and not self.supressed:
@@ -361,25 +361,25 @@ class LakeAvoidanceBhv(Behavior):
     def _get_operations(self, left, mid, right, mid_nc):
         
         if all([left, mid]):  # left and mid sensors on the edge
-            return [lambda: self.motor.turn(direction=LEFT, degrees=40)]
+            return [lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(direction=LEFT, degrees=40)]
 
     
         if all([mid, right]):  # mid and right sensors on the edge
-            return [lambda: self.motor.turn(direction=RIGHT, degrees=40)]
+            return [lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(direction=RIGHT, degrees=40)]
 
         
         if left:  # left sensor on the edge
-            return [lambda: self.motor.turn(direction=RIGHT, degrees=15)]
+            return [lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(direction=RIGHT, degrees=20)]
 
         if right:  # right sensor on the edge
-            return [lambda: self.motor.turn(direction=LEFT, degrees=15)]
+            return [lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(direction=LEFT, degrees=20)]
         
         
         if mid:  # left sensor on the edge
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(degrees=45)]
+            return [lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(degrees=40)]
         
         if mid_nc:  # mid sensor on the void (caused by some movements)
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(degrees=45)]
+            return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(degrees=40)]
 
         if DEBUG:
             timedlog("Lake sensors: " + str(left) + " " + str(mid) + " " + str(right) + " ")
@@ -401,7 +401,7 @@ class LakeAvoidanceBhv(Behavior):
         if DEBUG:
             timedlog("Lake collision")
 
-        avoid_stuck = [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(degrees=5)] if random.random() < 0.2 else []
+        avoid_stuck = [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(degrees=5)] if random.random() < 0.1 else []
         for operation in avoid_stuck + self.operations:
             operation()
             while self.motor.is_running and not self.supressed:
