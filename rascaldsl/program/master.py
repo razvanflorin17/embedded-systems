@@ -27,10 +27,11 @@ controller = Controller(return_when_no_action=True)
 
 my_display = Display()
 
-master_mac = '78:DB:2F:2B:5D:98'
+master_mac = '00:17:E9:B2:1E:41'
 master = True
 
 bluetooth_connection = BluetoothConnection(master, master_mac, debug=DEBUG)
+
 readings_dict = {"touch_left": False, "touch_right": False, "touch_back": False, "ult_front": 1000}
 
 # task_registry = TaskRegistry()

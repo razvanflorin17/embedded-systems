@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-DEBUG = False
+DEBUG = True
 if DEBUG:
     from ev3devlogging import timedlog
 import random
@@ -253,13 +253,16 @@ def read_color_sensor(cs):
     @param color_sensor: The color sensor to read
     @return: The color that was read
     """
-    try:
-        color = cs.color
-    except: 
-        if DEBUG:
-            timedlog("Color sensor wrong read")
-        return read_color_sensor(cs)
-    return int2color(color)
+    lock = threading.Lock()
+
+    with lock:
+        try:
+            color = cs.color
+        except: 
+            if DEBUG:
+                timedlog("Color sensor wrong read")
+            return read_color_sensor(cs)
+        return int2color(color)
 
 def read_ultrasonic_sensor(ultrasonic_sensor):
     """
@@ -267,13 +270,16 @@ def read_ultrasonic_sensor(ultrasonic_sensor):
     @param color_sensor: The ultrasonic sensor to read
     @return: The distance that was read
     """
-    try:
-        distance = ultrasonic_sensor.value()
-    except: 
-        if DEBUG:
-            timedlog("Ultrasonic sensor wrong read")
-        return read_ultrasonic_sensor(ultrasonic_sensor)
-    return distance
+    lock = threading.Lock()
+    
+    with lock:
+        try:
+            distance = ultrasonic_sensor.value()
+        except: 
+            if DEBUG:
+                timedlog("Ultrasonic sensor wrong read")
+            return read_ultrasonic_sensor(ultrasonic_sensor)
+        return distance
 
 def read_touch_sensor(touch_sensor):
     """
@@ -281,10 +287,13 @@ def read_touch_sensor(touch_sensor):
     @param color_sensor: The touch sensor to read
     @return: The touch that was read
     """
-    try:
-        touch = touch_sensor.is_pressed
-    except: 
-        if DEBUG:
-            timedlog("Touch sensor wrong read")
-        return read_touch_sensor(touch_sensor)
-    return touch
+    lock = threading.Lock()
+    
+    with lock:
+        try:
+            touch = touch_sensor.is_pressed
+        except: 
+            if DEBUG:
+                timedlog("Touch sensor wrong read")
+            return read_touch_sensor(touch_sensor)
+        return touch
