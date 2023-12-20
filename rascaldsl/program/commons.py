@@ -44,6 +44,10 @@ class ArmMotor():
     def stop(self):
         self.motor.stop()
 
+    @property
+    def is_running(self):
+        return self.motor.is_running
+
 
 class Motor():
     """
@@ -257,12 +261,29 @@ def read_color_sensor(cs):
 
     with lock:
         try:
-            color = cs.color
+            red, green, blue = cs.red, cs.green, cs.blue
+
+            if 150 < red < 250 and 150 < green < 250 and 0 < blue < 100:
+                return "yellow"
+            
+            if 100 < red < 200 and 0 < green < 100 and 0 < blue < 100:
+                return "red"
+            
+            if 0 < red < 100 and 0 < green < 100 and 50 < blue < 150:
+                return "blue"
+            
+            if 200 < red < 255 and 200 < green < 255 and 200 < blue < 255:
+                return "white"
+            
+            if 0 < red < 50 and 0 < green < 50 and 0 < blue < 50:
+                return "black"
+            
+            return "nocolor"
         except: 
             if DEBUG:
                 timedlog("Color sensor wrong read")
             return read_color_sensor(cs)
-        return int2color(color)
+        # return int2color(color)
 
 def read_ultrasonic_sensor(ultrasonic_sensor):
     """

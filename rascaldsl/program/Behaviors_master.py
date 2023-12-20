@@ -305,7 +305,7 @@ class LakeAvoidanceBhv(Behavior):
     This behavior will check if the robot is on a lake, and tries to step away from it
     """
 
-    def __init__(self, left_cs, mid_cs, right_cs, motor, leds=False, sound=False, lake_colors=["yellow", "blue", "red", "brown"]):
+    def __init__(self, left_cs, mid_cs, right_cs, motor, arm_motor, measure=False, leds=False, sound=False, lake_colors=["yellow", "blue", "red"]):
         """
         Initialize the behavior
         @param left_cs: The left color sensor to use
@@ -323,11 +323,15 @@ class LakeAvoidanceBhv(Behavior):
         self.mid_cs = mid_cs
         self.right_cs = right_cs
         self.motor = motor
+        self.arm_motor = arm_motor
         self.leds = leds
         self.sound = sound
+        self.measure = measure
+        self.last_color = None
 
         self.edge = {"left": False, "mid": False, "right": False, "mid_nc": False}
         self.lake_colors = lake_colors
+        self.detected_colors = {color: False for color in self.lake_colors}
         self.operations = []
 
 
@@ -339,10 +343,12 @@ class LakeAvoidanceBhv(Behavior):
         @rtype: bool
         """
         mid_color = read_color_sensor(self.mid_cs)
+        left_color = read_color_sensor(self.left_cs)
+        right_color = read_color_sensor(self.right_cs)
 
-        left_edge = read_color_sensor(self.left_cs) in self.lake_colors  # note maybe we should check against the table color instead of the edge color
+        left_edge = left_color in self.lake_colors  # note maybe we should check against the table color instead of the edge color
         mid_edge = mid_color in self.lake_colors
-        right_edge = read_color_sensor(self.right_cs) in self.lake_colors
+        right_edge = right_color in self.lake_colors
         mid_nc = mid_color == "nocolor"
 
         if left_edge != self.edge["left"] or mid_edge != self.edge["mid"] or right_edge != self.edge["right"] or mid_nc != self.edge["mid_nc"]:
@@ -352,11 +358,55 @@ class LakeAvoidanceBhv(Behavior):
             self.edge["mid_nc"] = mid_nc
             
             if any([left_edge, mid_edge, right_edge, mid_nc]):
-                self.operations = self._get_operations(left_edge, mid_edge, right_edge, mid_nc)
+                timedlog(left_color + ' ' + mid_color + ' ' + right_color)
+                
+                if self.measure:
+                    timedlog(self.detected_colors)
+                    color = next((color for color in [left_color, mid_color, right_color] if color in self.lake_colors), None)
+                    if color is not None:
+                        if self.detected_colors[color]:
+                            self.operations = self._get_operations(left_edge, mid_edge, right_edge, mid_nc)
+                        else:
+                            self.last_color = next((c for c in self.lake_colors if not self.detected_colors[c]), None)
+                            timedlog("LAST COLOR -----------------------")
+                            timedlog(self.last_color)
+                            self.operations = self._get_operations_measure(left_edge, mid_edge, right_edge, mid_nc)
+                    else:
+                        self.operations = self._get_operations(left_edge, mid_edge, right_edge, mid_nc)
+                else:
+                    self.operations = self._get_operations(left_edge, mid_edge, right_edge, mid_nc)
                 return True
 
         return False
     
+
+    def _get_operations_measure(self, left, mid, right, mid_nc):
+        if all([left, mid]):
+            return [lambda: self.motor.turn(direction=LEFT, degrees=5), 
+                    lambda: self.arm_motor.move(up=False, block=True), lambda: self.arm_motor.move(block=True),
+                    lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(direction=LEFT, degrees=40)]
+        
+        if all([mid, right]):
+            return [lambda: self.motor.turn(direction=RIGHT, degrees=5), 
+                    lambda: self.arm_motor.move(up=False, block=True), lambda: self.arm_motor.move(block=True),
+                    lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(direction=RIGHT, degrees=40)]
+        
+        if left:
+            return [lambda: self.motor.turn(direction=LEFT, degrees=15), 
+                    lambda: self.arm_motor.move(up=False, block=True), lambda: self.arm_motor.move(block=True),
+                    lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(direction=LEFT, degrees=20)]
+
+        if right:
+            return [lambda: self.motor.turn(direction=RIGHT, degrees=15), 
+                    lambda: self.arm_motor.move(up=False, block=True), lambda: self.arm_motor.move(block=True),
+                    lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(direction=RIGHT, degrees=20)]
+                        
+        if mid:
+            return [lambda: self.arm_motor.move(up=False, block=True), lambda: self.arm_motor.move(block=True),
+                    lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(degrees=40)]
+
+        return []
+
 
     def _get_operations(self, left, mid, right, mid_nc):
         
@@ -406,6 +456,9 @@ class LakeAvoidanceBhv(Behavior):
             operation()
             while self.motor.is_running and not self.supressed:
                 pass
+            if self.last_color is not None:
+                self.detected_colors[self.last_color] = True
+                self.last_color = None
             if self.supressed:
                 break
         
