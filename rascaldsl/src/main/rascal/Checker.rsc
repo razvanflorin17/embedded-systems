@@ -389,7 +389,7 @@ void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <ListMod listMod> <I
 
 // Roverconfig
 
-void collect(current: (RoverConfig)`Rover: PERFORM <IDList missions> MAC: <STR macAddress>`, Collector c) {
+void collect(current: (RoverConfig)`Rover: <IDList missions> MAC: <STR macAddress>`, Collector c) {
      collect(missions, c);
      collectIdList(c, missions, missionId());
 }

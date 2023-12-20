@@ -6,8 +6,6 @@ tc == INDISTANCE front 10
 td == ta + tc + tb
 te == ta + td
 
-
-
 aa := FORWARD 10
 ab := TURN 90
 ac := BEEP
@@ -18,13 +16,13 @@ ad := aa + ac
 Behavior: ba WHEN ta DO aa
 Behavior: bb WHEN ta DO [aa, ac]
 Behavior: bc WHEN ANY [ta, tb] DO ad
-Behavior: bd WHEN ANY [ta, tb] DO [ad, aa]
+Behavior: bd WHEN ANY [ta, td] DO [ad, aa]
 
 
 
 Mission: ma EXECUTE ta WHILE ba
 Mission: mb EXECUTE ta WHILE [ba, bb]
 Mission: mc EXECUTE ANY [ta, tb] WHILE ba
-Mission: md EXECUTE ANY [ta, tb] WHILE [ba, bb, bc]
+Mission: md EXECUTE ANY [ta, tb] WHILE [ba, bb, bd]
 
-Rover: PERFORM [ma, mb, mc, md] MAC: "211"
+Rover: [md] MAC: "211"

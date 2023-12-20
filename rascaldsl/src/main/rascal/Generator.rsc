@@ -34,26 +34,32 @@ DefInfo findReferenceFromSrc(TModel tm, src) {
 str generator(cst) { // WIP
     tm = modulesTModelFromTree(cst);
     retVal = "";
-    if(/(RoverConfig) `Rover: PERFORM <IDList missions> MAC: <STR mac>` := cst) {
+    trigger_list = [];
+    action_list = [];
+    if(/(RoverConfig) `Rover: <IDList missions> MAC: <STR mac>` := cst) {
+        
+        bhv_list = extractBhvs(missions, tm);
+        bhv_def = printBhvDef(bhv_list, tm);
         retVal = "
         '<mac>
         '
-        '<generateBhvsFromMissions(missions, tm)>
+        '<bhv_list>
         '
-        '
-        '<for (<mission> <- {<id> |/(ID) `<ID id>` := missions}) {>
-        '<mission>:<printMission(mission, tm)>
-        '<}>
+        '<bhv_def>
         '
         '
         '";
     }
+        // '<generateBhvsFromMissions(missions, tm)>
 
+        // '<for (<mission> <- {<id> |/(ID) `<ID id>` := missions}) {>
+        // '<mission>:<printMission(mission, tm)>
+        // '<}>
     return retVal;
 }
 
 
-list[loc] extractBhvsToGenerate(missions, tm) {
+list[loc] extractBhvs(missions, tm) {
     bhvs = ();
     for (<mission> <- {<id> |/(ID) `<ID id>` := missions}) {
         DefInfo defInfo = findReference(tm, mission);
@@ -68,66 +74,136 @@ list[loc] extractBhvsToGenerate(missions, tm) {
     return [bhvs[bhv] | bhv <- bhvs];
 }
 
-str generateBhvsFromMissions(missions, tm) {
-    bhvs = extractBhvsToGenerate(missions, tm);
+// tuple[list[str], list[str]] generateComponentsFromBhvs(bhv_list, tm) {
+//     trigger_list = ["try", "simple"];
+//     action_list = ["try", "simple", "action"];
 
-
-
-
-    // taskList = [];
-    //         for (task <- miss.taskList) {
-    //             taskList += generateTriggerFromId(tm, miss.taskListSrc);
-    //         }
-    //         if (miss.taskListMod != "ALLORD") { taskList = toList(toSet(taskList)); } // verify order
-
-    return intercalate("\n", bhvs);
-}
-
-// generateTriggerFromList(triggers, triggerListMod, tm) {
+//     return <trigger_list, action_list>;
 // }
 
 
-str printMission(mission, tm) {
-    DefInfo defInfo = findReference(tm, mission);
-    retVal = ["CONTROLLER = Controller(return_when_no_action=True)"];
-    
-    if (miss <- defInfo.mission) {
-        retVal += "<miss>";
+str printTriggers(list[str] trigger_list, list_mod) {
+    retVal = [];
+    for (trigger <- trigger_list) {
+        retVal += "<trigger>";
     }
-
-    return intercalate("\n", retVal);
+    if (list_mod == "ANY")
+        return intercalate(" or ", retVal);
+    else 
+        return intercalate(" and ", retVal);
 }
 
-str tmp_print(ast, tm) {
+str printActions(list[str] action_list) {
     retVal = [];
-    // for(<t, a> <- {<idTrigger, idAction> | /(Mission) `Mission: <ID idTrigger> DO <ID idAction>` := ast}) {
-    //     retVal += "<printTriggerFromId(tm, t.src)>";
-    //     retVal += "<printActionFromId(tm, a.src)>";
-    // }
+    for (action <- action_list) {
+        retVal += "lambda: <action>";
+    }
+    return "[" + intercalate(", ", retVal) + "]";
+}
+
+str printBhvDef(list[loc] bhv_list, tm) {
+    trigger_map = ();
+    action_map = ();
+    retVal = [];
+    for (bhvSrc <- bhv_list) {
+        DefInfo defInfo = findReferenceFromSrc(tm, bhvSrc);
+        bhv_str = getContent(bhvSrc);
+        if (bhv <- defInfo.behavior) {
+            
+            trigger_list = [];
+            for (trigger <- bhv.triggerList) {
+                tmp_ret = generateTriggerFromId(tm, trigger, trigger_map);
+                trigger_list += tmp_ret[0];
+                trigger_map = tmp_ret[1];
+            }
+            trigger_list = toList(toSet(trigger_list));
+            action_list = [];
+            for (action <- bhv.actionList) {
+                tmp_ret = generateActionFromId(tm, action, action_map);
+                action_list += tmp_ret[0];
+                action_map = tmp_ret[1];
+            }
+
+            retVal += "
+            'class <bhv_str>(Behavior):
+            '\tdef __init__(self):
+            '\t\tBehavior.__init__(self)
+            '\t\tself.has_fired = False
+            '\t\tself.suppresed = False
+            '
+            '\tdef check(self):
+            '\t\tself.has_fired = <printTriggers(trigger_list, bhv.triggerListMod)>
+            '\t\treturn self.has_fired
+            '
+            '\tdef action(self):
+            '\t\tself.suppresed = False
+            '\t\t<printActions(action_list)>
+            '
+            '
+            '
+            '
+            '
+            '<trigger_map>
+            '<action_map>
+            '";
+
+        }
+    }
     return intercalate("\n\n\n", retVal);
 }
 
-list[str] generateTriggerFromId(tm, startIdSrc) {
+
+
+// str printMission(mission, tm) {
+//     DefInfo defInfo = findReference(tm, mission);
+//     retVal = ["CONTROLLER = Controller(return_when_no_action=True)"];
+    
+//     if (miss <- defInfo.mission) {
+//         retVal += "<miss>";
+//     }
+
+//     return intercalate("\n", retVal);
+// }
+
+
+tuple[list[str], map[str, list[str]]] generateTriggerFromId(tm, startIdSrc, map[str, list[str]] trigger_map) {
     retVal = [];
+    trigger_str = getContent(startIdSrc);
+
+    if (trigger_str in trigger_map) {
+        retVal += trigger_map[trigger_str];
+        return <retVal, trigger_map>;
+    }
     DefInfo defInfo = findReferenceFromSrc(tm, startIdSrc);
     if (l <- defInfo.idList) {
         for (idSrc <- l.idList) {
-            retVal += generateTriggerFromId(tm, idSrc);
+            tmp_ret = generateTriggerFromId(tm, idSrc, trigger_map);
+            retVal += tmp_ret[0];
+            trigger_map = tmp_ret[1];
         }
     }
     else if (ct <- defInfo.colorTrigger) {retVal += "<ct>"; }
     else if (dt <- defInfo.distanceTrigger) {retVal += "<dt>"; }
     else if (tt <- defInfo.touchTrigger) {retVal += "<tt>"; }
 
-    return retVal;
+    trigger_map += (trigger_str: retVal);
+    return <retVal, trigger_map>;
 }
 
-list[str] generateActionFromId(tm, startIdSrc) {
+tuple[list[str], map[str, list[str]]] generateActionFromId(tm, startIdSrc, map[str, list[str]] action_map) {
     retVal = [];
+    action_str = getContent(startIdSrc);
+
+    if (action_str in action_map) {
+        retVal += action_map[action_str];
+        return <retVal, action_map>;
+    }
     DefInfo defInfo = findReferenceFromSrc(tm, startIdSrc);
     if (l <- defInfo.idList) {
         for (idSrc <- l.idList) {
-            retVal += generateActionFromId(tm, idSrc);
+            tmp_ret = generateActionFromId(tm, idSrc, action_map);
+            retVal += tmp_ret[0];
+            action_map = tmp_ret[1];
         }
     }
     else if (ma <- defInfo.moveAction) {retVal += "<ma>"; }
@@ -135,7 +211,8 @@ list[str] generateActionFromId(tm, startIdSrc) {
     else if (sa <- defInfo.speakAction) {retVal += "<sa>"; }
     else if (la <- defInfo.ledAction) {retVal += "<la>"; }
 
-    return retVal;
+    action_map += (action_str: retVal);
+    return <retVal, action_map>;
 }
 
 // str printTriggerIDList(idList) {

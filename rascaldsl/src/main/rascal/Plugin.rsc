@@ -27,7 +27,7 @@ set[LanguageService] contribs() = {
     }),
     lenses(rel[loc src, Command lens] (start[Planning] p) {
         return {
-            <p.src, gen(p.top, title="Generate text file")>
+            <p.src, gen(p.top, title="Generate python file (remember to save)")>
         };
     }),
     summarizer(tdslSummarizer),
@@ -41,6 +41,7 @@ value exec(gen(Planning p)) {
     edit(outputFile);
     return ("result": true);
 }
+
 
 void main() {
     registerLanguage(tdslLang);

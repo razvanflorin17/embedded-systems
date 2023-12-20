@@ -11,7 +11,7 @@ start syntax Planning
 ;
 
 syntax RoverConfig  //W.I.P.
-    = new: "Rover: PERFORM" IDList missions "MAC:" STR macAddress 
+    = new: "Rover:" IDList missions "MAC:" STR macAddress 
 ;
 
 syntax Mission
@@ -101,4 +101,4 @@ lexical ID = ([a-zA-Z/.\-][a-zA-Z0-9_/.]* !>> [a-zA-Z0-9_/.]) \ Reserved;
 lexical STR = "\"" ![\"\n]* "\"";
 
 keyword Reserved = "Mission:" | "Behavior:" | "WHEN" | "WHILE" | "DO" |"green" | "red" | "blue" | "black" | "yellow" | "amber" | "orange" 
-        | "FORWARD" | "BACKWARD" | "TURN" | "SPEAK" | "LED"| "BEEP" | "ANY" | "ALL" | "ALLORD" | ":" | "left" | "right" | "mid" | "back" | "front" | "EXECUTE" | "PERFORM" | "MAC:" | "Rover:";
+        | "FORWARD" | "BACKWARD" | "TURN" | "SPEAK" | "LED"| "BEEP" | "ANY" | "ALL" | "ALLORD" | ":" | "left" | "right" | "mid" | "back" | "front" | "EXECUTE" | "PERFORM" | "MAC:";
