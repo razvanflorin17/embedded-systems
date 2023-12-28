@@ -35,11 +35,13 @@ class ArmMotor():
         self.motor = motor
         self.base_speed = base_speed
     
-    def move(self, up=True, rotations=1, block=False):
+    def move(self, up=True, rotations=1, speed=None, block=False):
+        if speed is None:
+            speed = self.base_speed
         if up:
-            self.motor.on_for_rotations(SpeedPercent(self.base_speed), rotations, block=block)
+            self.motor.on_for_rotations(SpeedPercent(speed), rotations, block=block)
         else:
-            self.motor.on_for_rotations(SpeedPercent(-self.base_speed), rotations, block=block)
+            self.motor.on_for_rotations(SpeedPercent(-speed), rotations, block=block)
 
     def stop(self):
         self.motor.stop()
@@ -137,11 +139,17 @@ class TaskRegistry():
     def set(self, task_name, value):
         self.tasks[task_name] = value
 
+    def update(self, task_name, value):
+        self.tasks[task_name] = max(self.tasks[task_name], value)
+
     def get(self, task_name):
         return self.tasks[task_name]
     
     def tasks_done(self):
         return all(self.tasks.values())
+    
+    def reset(self):
+        self.tasks = {}
 
 
 class BluetoothConnection():

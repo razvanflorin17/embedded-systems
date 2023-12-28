@@ -33,6 +33,7 @@ data AType
      | turnActionType()
      | speakActionType()
      | ledActionType()
+     | measureActionType()
      | behaviorType()
      | missionType()
 ;
@@ -45,10 +46,11 @@ data TouchTrigger = touchTrigger(str sensor = "");
 
 data IDList = idList(list[loc] idList = []);
 
-data MoveAction = moveAction(str direction = "", int distance = 0);
-data TurnAction = turnAction(int angle = 0);
+data MoveAction = moveAction(str direction = "", int distance = 0, int speed = 15);
+data TurnAction = turnAction(str direction = "", int angle = 0, int speed = 10);
 data SpeakAction = speakAction(str text = "");
 data LedAction = ledAction(str color = "");
+data MeasureAction = measureAction(int time=1);
 
 data Behavior = behavior(list[loc] triggerList = [], list[loc] actionList = [], str triggerListMod="ALL");
 data Mission = mission(list[loc] taskList = [], list[loc] behaviorList = [], str taskListMod="ALL");
@@ -66,6 +68,7 @@ data DefInfo(list[MoveAction] moveAction = []);
 data DefInfo(list[TurnAction] turnAction = []);
 data DefInfo(list[SpeakAction] speakAction = []);
 data DefInfo(list[LedAction] ledAction = []);
+data DefInfo(list[MeasureAction] measureAction = []);
 
 data DefInfo(list[Behavior] behavior = []);
 data DefInfo(list[Mission] mission = []);
@@ -115,6 +118,33 @@ list[loc] collectIdList(Collector c, idCollectList, role) {
      return result;
 }
 
+int computeDistance(distance) {
+     if(/(Distance) `<NATURAL distance>` := distance) {
+          return toInt("<distance>");
+     }
+     else if(/(Distance) `<NATURAL distance> <DistanceUnit unit>` := distance) {
+          int distance_value = toInt("<distance>");
+          if(/(DistanceUnit) `cm` := unit) return distance_value;
+          else if(/(DistanceUnit) `m` := unit) return distance_value * 100;
+          else if(/(DistanceUnit) `mm` := unit) return distance_value / 10;
+          else if(/(DistanceUnit) `dm` := unit) return distance_value * 10;
+     }
+     return 0;
+}
+
+int computeTime(time_input) {
+     if(/(Time) `<NATURAL time>` := time_input) {
+          return toInt("<time>");
+     }
+     else if(/(Time) `<NATURAL time> <TimeUnit unit>` := time_input) {
+          int time_value = toInt("<time>");
+          if(/(TimeUnit) `s` := unit) return time_value;
+          else if(/(TimeUnit) `min` := unit) return time_value * 60;
+          else if(/(TimeUnit) `h` := unit) return time_value * 3600;
+     }
+     return 0;
+}
+
 // typepal collectors
 
 void collect(current: (IDList)`<IDList idlist>`, Collector c) {
@@ -127,7 +157,7 @@ void collect(current: (RoverTrigger) `COLOR <ColorSensor colorSensor> <ColorRead
      c.fact(current, colorTriggerType());
 }
 
-void collect(current: (RoverTrigger) `INDISTANCE <DistanceSensor distanceSensor> <NATURAL distance>`, Collector c) {
+void collect(current: (RoverTrigger) `INDISTANCE <DistanceSensor distanceSensor> <Distance distance>`, Collector c) {
      c.fact(current, distanceTriggerType());
 }
 
@@ -142,9 +172,9 @@ void collect(current: (Trigger) `<ID idNew> <TriggerAssignment triggerAssignment
           dt.colorTrigger = [colorTrigger(sensor="<colorSensor>", color="<color>")];
           c.define("<idNew>", triggerId(), idNew, dt);
      }
-     else if(/(DistanceTrigger)`INDISTANCE <DistanceSensor distanceSensor> <NATURAL distance>` := roverTrigger) {
+     else if(/(DistanceTrigger)`INDISTANCE <DistanceSensor distanceSensor> <Distance distance>` := roverTrigger) {
           dt = defType(distanceTriggerType());
-          dt.distanceTrigger = [distanceTrigger(sensor="<distanceSensor>", distance=toInt("<distance>"))];
+          dt.distanceTrigger = [distanceTrigger(sensor="<distanceSensor>", distance=computeDistance(distance))];
           c.define("<idNew>", triggerId(), idNew, dt);
      }
      else if(/(TouchTrigger)`TOUCH <TouchSensor touchSensor>`:= roverTrigger) {
@@ -191,17 +221,19 @@ void collect(current: (RoverAction) `<RoverAction roverAction>`, Collector c) {
      else if(/(LedAction) `<LedAction ledAction>` := roverAction) {
           c.fact(ledAction, ledActionType());
      }
+     else if(/(MeasureAction) `<MeasureAction measureAction>` := roverAction) {
+          c.fact(measureAction, measureActionType());
+     }
 }
 
 //DEFINITION
-void collect(current: (Action)`<ID idNew> <ActionAssignment actionAssignment> <RoverAction roverAction>`,  Collector c) {
+void collect(current:(Action)`<ID idNew> <ActionAssignment actionAssignment> <RoverAction roverAction>`,  Collector c) {
      if(/(MoveAction) `<MoveAction moveAction>` := roverAction) {
-          dt = createMoveAction(moveAction);
+          dt = createMoveAction(moveAction, c);
           c.define("<idNew>", actionId(), idNew, dt);
      }
-     else if(/(TurnAction) `TURN <ANGLE angle>` := roverAction) {
-          dt = defType(turnActionType());
-          dt.turnAction = [turnAction(angle=toInt("<angle>"))];
+     else if(/(TurnAction) `<TurnAction turnAction>` := roverAction) {
+          dt = createTurnAction(turnAction, c);
           c.define("<idNew>", actionId(), idNew, dt);
      }
      else if(/(SpeakAction) `<SpeakAction speakAction>` := roverAction) {
@@ -213,20 +245,58 @@ void collect(current: (Action)`<ID idNew> <ActionAssignment actionAssignment> <R
           dt.ledAction = [ledAction(color="<color>")];
           c.define("<idNew>", actionId(), idNew, dt);
      }
+     else if(/(MeasureAction) `MEASURE <Time? time>` := roverAction) {
+          dt = defType(measureActionType());
+          time_value = 1;
+          if(/(MeasureAction) `MEASURE <Time time>` := roverAction) time_value = computeTime(time);
+          dt.measureAction = [measureAction(time=time_value)];
+          c.define("<idNew>", actionId(), idNew, dt);
+     }
+
      collect(roverAction, c);
 }
 
-DefInfo createMoveAction(action) {
+DefInfo createMoveAction(action, Collector c) {
      dt = defType(moveActionType());
+     speed_value = 15; // default speed for moving
+
+     if(/(Speed) `<PERCENTAGE speed>` := action) {
+          speed_value = toInt(replaceLast("<speed>", "%", ""));
+          if (speed_value > 30) c.report(warning(speed, "speed higher than 30%% could be dangerous"));
+     }
+
      if (/(MoveAction) `STOP` := action) {
           dt.moveAction = [moveAction(direction="stop", distance=0)];
      }
-     else if (/(MoveAction) `FORWARD <NATURAL distance>` := action) {
-          dt.moveAction = [moveAction(direction="forward", distance=toInt("<distance>"))];
+     else if (/(MoveAction) `FORWARD <Distance distance> <Speed? _>` := action) {
+          dt.moveAction = [moveAction(direction="forward", distance=computeDistance(distance), speed=speed_value)];
      }
-     else if (/(MoveAction) `BACKWARD <NATURAL distance>` := action) {
-          dt.moveAction = [moveAction(direction="backward", distance=toInt("<distance>"))];
+     else if (/(MoveAction) `BACKWARD <Distance distance> <Speed? _>` := action) {
+          dt.moveAction = [moveAction(direction="backward", distance=computeDistance(distance), speed=speed_value)];
      }
+     return dt;
+}
+
+DefInfo createTurnAction(action, Collector c) {
+     dt = defType(turnActionType());
+     speed_value = 10; // default speed for turning
+
+     if(/(Speed) `<PERCENTAGE speed>` := action) {
+          speed_value = toInt(replaceLast("<speed>", "%", ""));
+          if (speed_value > 30) c.report(warning(speed, "speed higher than 30%% could be dangerous"));
+
+     }
+ 
+     if (/(TurnAction) `LEFT <ANGLE angle> <Speed? _>` := action) {
+          dt.turnAction = [turnAction(direction="left", angle=toInt(replaceLast("<angle>", "°", "")), speed=speed_value)];
+     }
+     else if (/(TurnAction) `RIGHT <ANGLE angle> <Speed? _>` := action) {
+          dt.turnAction = [turnAction(direction="right", angle=toInt(replaceLast("<angle>", "°", "")), speed=speed_value)];
+     }
+     else if (/(TurnAction) `RANDOM <ANGLE angle> <Speed? _>` := action) {
+          dt.turnAction = [turnAction(direction="none", angle=toInt(replaceLast("<angle>", "°", "")), speed=speed_value)];
+     }
+     
      return dt;
 }
 
@@ -255,7 +325,7 @@ void collect(current: (Action) `<ID idNew> <ActionAssignment actionAssignment> <
      c.calculate("trigger idList assignment", current, [idNew, idActionList],
           AType (Solver s) { 
                checkIdList(current, s, idActionList, 
-               [moveActionType(), turnActionType(), speakActionType(), ledActionType(), idListType()], ["<idNew>"]);
+               [moveActionType(), turnActionType(), speakActionType(), ledActionType(), measureActionType(), idListType()], ["<idNew>"]);
                return idListType();
      });
 }
@@ -283,7 +353,7 @@ void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ID idTrigger> DO <ID
      c.calculate("action idList check", current, [idActions],
           AType (Solver s) { 
                checkIdList(current, s, idActions, 
-               [moveActionType(), turnActionType(), touchTriggerType(), speakActionType(), ledActionType(), idListType()], []);
+               [moveActionType(), turnActionType(), touchTriggerType(), speakActionType(), ledActionType(), measureActionType(), idListType()], []);
                return idListType();
      });
 
@@ -293,7 +363,7 @@ void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ID idTrigger> DO <ID
 }
 
 // n trigger, 1 action
-void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ListMod listMod> <IDList idTriggers> DO <ID idAction>`,  Collector c) {
+void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ListMod? listMod> <IDList idTriggers> DO <ID idAction>`,  Collector c) {
      c.use(idAction, {actionId()});
 
      triggerList = collectIdList(c, idTriggers, triggerId());
@@ -305,19 +375,22 @@ void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ListMod listMod> <ID
                return idListType();
      });
 
+     listMod_value = "ALL";
+     if(current has listMod) listMod_value = "<listMod>";
+
      dt = defType(behaviorType());
-     dt.behavior = [behavior(triggerList=triggerList, actionList=[idAction.src], triggerListMod="<listMod>")];
+     dt.behavior = [behavior(triggerList=triggerList, actionList=[idAction.src], triggerListMod=listMod_value)];
      c.define("<idNew>", behaviorId(), idNew, dt);
 }
 
 // n trigger, n action
-void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ListMod listMod> <IDList idTriggers> DO <IDList idActions>`,  Collector c) {
+void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ListMod? listMod> <IDList idTriggers> DO <IDList idActions>`,  Collector c) {
      actionList = collectIdList(c, idActions, actionId());
      collect(idActions, c);
      c.calculate("action idList check", current, [idActions],
           AType (Solver s) { 
                checkIdList(current, s, idActions, 
-               [moveActionType(), turnActionType(), touchTriggerType(), speakActionType(), ledActionType(), idListType()], []);
+               [moveActionType(), turnActionType(), touchTriggerType(), speakActionType(), ledActionType(), measureActionType(), idListType()], []);
                return idListType();
      });
 
@@ -330,8 +403,11 @@ void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ListMod listMod> <ID
                return idListType();
      });
 
+     listMod_value = "ALL";
+     if(current has listMod) listMod_value = "<listMod>";
+     
      dt = defType(behaviorType());
-     dt.behavior = [behavior(triggerList=triggerList, actionList=actionList, triggerListMod="<listMod>")];
+     dt.behavior = [behavior(triggerList=triggerList, actionList=actionList, triggerListMod=listMod_value)];
      c.define("<idNew>", behaviorId(), idNew, dt);
 }
 
@@ -361,27 +437,33 @@ void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <ID idTask> WHILE <I
 }
 
 // n trigger, 1 action
-void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <ListMod listMod> <IDList idTasks> WHILE <ID idBhv>`,  Collector c) {
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <ListMod? listMod> <IDList idTasks> WHILE <ID idBhv>`,  Collector c) {
      c.use(idBhv, {behaviorId()});
 
      taskList = collectIdList(c, idTasks, triggerId());
      collect(idTasks, c);
 
+     listMod_value = "ALL";
+     if(current has listMod) listMod_value = "<listMod>";   
+
      dt = defType(missionType());
-     dt.mission = [mission(taskList=taskList, behaviorList=[idBhv.src], taskListMod="<listMod>")];
+     dt.mission = [mission(taskList=taskList, behaviorList=[idBhv.src], taskListMod=listMod_value)];
      c.define("<idNew>", missionId(), idNew, dt);
 }
 
 // n trigger, n action
-void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <ListMod listMod> <IDList idTasks> WHILE <IDList idBhvs>`,  Collector c) {
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <ListMod? listMod> <IDList idTasks> WHILE <IDList idBhvs>`,  Collector c) {
      behaviorList = collectIdList(c, idBhvs, behaviorId());
      collect(idBhvs, c);
 
      taskList = collectIdList(c, idTasks, triggerId());
      collect(idTasks, c);
 
+     listMod_value = "ALL";
+     if(current has listMod) listMod_value = "<listMod>";
+
      dt = defType(missionType());
-     dt.mission = [mission(taskList=taskList, behaviorList=behaviorList, taskListMod="<listMod>")];
+     dt.mission = [mission(taskList=taskList, behaviorList=behaviorList, taskListMod=listMod_value)];
      c.define("<idNew>", missionId(), idNew, dt);
 }
 
