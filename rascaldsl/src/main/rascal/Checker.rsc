@@ -102,7 +102,7 @@ private TypePalConfig getModulesConfig() = tconfig(
 
 // helper methods
 
-void checkIdList(current, Solver s, idCheckList, list[AType] validTypes, list[str] excludedIds) {
+void checkIdList(Solver s, idCheckList, list[AType] validTypes, list[str] excludedIds) {
      for (<id> <- {<id> |/(ID) `<ID id>` := idCheckList}) {
           s.requireFalse(("<id>" in excludedIds), error(id, "%v is excluded", "<id>"));
           s.requireTrue((s.getType(id) in validTypes), error(id,  "type should be one of %v, instead of %t", validTypes, id));
@@ -199,7 +199,7 @@ void collect(current: (Trigger) `<ID idNew> <TriggerAssignment triggerAssignment
 
      c.calculate("trigger idList assignment", current, [idNew, idTriggerList],
           AType (Solver s) { 
-               checkIdList(current, s, idTriggerList, 
+               checkIdList(s, idTriggerList, 
                [colorTriggerType(), distanceTriggerType(), touchTriggerType(), idListType()], ["<idNew>"]);
                return idListType();
      });
@@ -324,7 +324,7 @@ void collect(current: (Action) `<ID idNew> <ActionAssignment actionAssignment> <
 
      c.calculate("trigger idList assignment", current, [idNew, idActionList],
           AType (Solver s) { 
-               checkIdList(current, s, idActionList, 
+               checkIdList(s, idActionList, 
                [moveActionType(), turnActionType(), speakActionType(), ledActionType(), measureActionType(), idListType()], ["<idNew>"]);
                return idListType();
      });
@@ -352,7 +352,7 @@ void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ID idTrigger> DO <ID
      collect(idActions, c);
      c.calculate("action idList check", current, [idActions],
           AType (Solver s) { 
-               checkIdList(current, s, idActions, 
+               checkIdList(s, idActions, 
                [moveActionType(), turnActionType(), touchTriggerType(), speakActionType(), ledActionType(), measureActionType(), idListType()], []);
                return idListType();
      });
@@ -370,7 +370,7 @@ void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ListMod? listMod> <I
      collect(idTriggers, c);
      c.calculate("trigger idList check", current, [idTriggers],
           AType (Solver s) { 
-               checkIdList(current, s, idTriggers, 
+               checkIdList(s, idTriggers, 
                [colorTriggerType(), distanceTriggerType(), touchTriggerType(), idListType()], []);
                return idListType();
      });
@@ -389,7 +389,7 @@ void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ListMod? listMod> <I
      collect(idActions, c);
      c.calculate("action idList check", current, [idActions],
           AType (Solver s) { 
-               checkIdList(current, s, idActions, 
+               checkIdList(s, idActions, 
                [moveActionType(), turnActionType(), touchTriggerType(), speakActionType(), ledActionType(), measureActionType(), idListType()], []);
                return idListType();
      });
@@ -398,7 +398,7 @@ void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ListMod? listMod> <I
      collect(idTriggers, c);
      c.calculate("trigger idList check", current, [idTriggers],
           AType (Solver s) { 
-               checkIdList(current, s, idTriggers, 
+               checkIdList(s, idTriggers, 
                [colorTriggerType(), distanceTriggerType(), touchTriggerType(), idListType()], []);
                return idListType();
      });
