@@ -42,7 +42,10 @@ str generator(cst) { // WIP
         tmp_ret = generateBhvsDef(bhv_list, tm);
         bhv_def = tmp_ret[0];
         trigger_map = tmp_ret[1];
+        action_map = tmp_ret[2];
+
         retVal = "
+        '
         '<mac>
         '
         '<bhv_list>
@@ -50,31 +53,38 @@ str generator(cst) { // WIP
         '<bhv_def>
         '
         '
-        '<generateMissionsDef(missions, tm, trigger_map)>
+        '<generateMissionsDef(missions, tm, trigger_map, action_map)>
         '
         '
         '<printMissionsUsage(missions, tm)>
         '";
+
     }
+    // retValTmp = [];
+    // for (<tl> <- {<taskList> | /(TaskList) `<TaskList taskList>` := cst}) {
+    //     retValTmp += "<printTaskList(tl)>";
+    // }
+
+    
+
 
     return retVal;
+
 }
-
-
-
 
 list[loc] extractBhvs(missions, tm) {
     bhvs = ();
-    for (<mission> <- {<id> |/(ID) `<ID id>` := missions}) {
+    for (<mission> <- [<id> |/(ID) `<ID id>` := missions]) {
         DefInfo defInfo = findReference(tm, mission);
         if (miss <- defInfo.mission) {
             for (behavior <- miss.behaviorList) {
-                if(getContent(behavior) notin bhvs)
-                bhvs += (getContent(behavior): behavior);
+                if(getContent(behavior) notin bhvs) {
+                    bhvs += (getContent(behavior): behavior);
+                }
+                
             }
         }
     }
-
     return [bhvs[bhv] | bhv <- bhvs];
 }
 
@@ -98,7 +108,7 @@ str printListLambda(list[str] input_list) {
     return "[" + intercalate(", ", retVal) + "]";
 }
 
-tuple[str, map[str, list[str]]] generateBhvsDef(list[loc] bhv_list, tm) {
+tuple[str, map[str, list[DefInfo]], map[str, list[DefInfo]]] generateBhvsDef(list[loc] bhv_list, tm) {
     trigger_map = ();
     action_map = ();
     retVal = [];
@@ -109,14 +119,14 @@ tuple[str, map[str, list[str]]] generateBhvsDef(list[loc] bhv_list, tm) {
             
             trigger_list = [];
             for (trigger <- bhv.triggerList) {
-                tmp_ret = extractComponentFromId(tm, trigger, trigger_map, generateTrigger);
-                trigger_list += tmp_ret[0];
+                tmp_ret = extractComponentFromId(tm, trigger, trigger_map);
+                trigger_list += generateFromDefInfo(tmp_ret[0], generateTrigger);
                 trigger_map = tmp_ret[1];
             }
             action_list = [];
             for (action <- bhv.actionList) {
-                tmp_ret = extractComponentFromId(tm, action, action_map, generateAction);
-                action_list += tmp_ret[0];
+                tmp_ret = extractComponentFromId(tm, action, action_map);
+                action_list += generateFromDefInfo(tmp_ret[0], generateAction);
                 action_map = tmp_ret[1];
             }
 
@@ -151,7 +161,7 @@ tuple[str, map[str, list[str]]] generateBhvsDef(list[loc] bhv_list, tm) {
 
         }
     }
-    return <intercalate("\n\n\n", retVal), trigger_map>;
+    return <intercalate("\n\n\n", retVal), trigger_map, action_map>;
 }
 
 str printBhvDef(states_init, states_check, bhv_str) {
@@ -204,44 +214,109 @@ str printBhvDef(states_init, states_check, bhv_str) {
 }
 
 
-str printTaskBhv(list[value] task_list, task_list_mod, mission_name) {
-    
-    list[str] states_init = [];
-    list[str] states_check = [];
-    if (task_list_mod == "ANY") {
-        states_init += "TASK_REGISTRY.add(\"ANY\")";
-        states_check += "TASK_REGISTRY.update(\"ANY\", (<printTriggers(task_list, task_list_mod)>))";
-    }
-    else if (task_list_mod == "ALL") {
-        int cont = 0;
-        for (trigger <- task_list) {
-            cont = cont + 1;
-            states_init += "TASK_REGISTRY.add(\"state_<cont> \")";
-            states_check += "TASK_REGISTRY.update(\"state_<cont> \", (<trigger>))";
+str generateMissionsDef(missions, tm, trigger_map, action_map) {
+    retVal = [];
+    mission_set = ();
+    for (<mission> <- {<id> |/(ID) `<ID id>` := missions}) {
+        if ("<mission>" notin mission_set) {
+            mission_set += ("<mission>": mission);
         }
     }
-    else {
-        states_init += "TASK_REGISTRY.add(\"ALLORD\")";
-        states_init += "self.counter_task = 0";
-        states_init += "self.task_list = <printListLambda(task_list)>";
+    mission_list = [mission_set[miss] | miss <- mission_set];  
+    for (mission <- mission_list) {
+        DefInfo defInfo = findReference(tm, mission);
+        if (miss <- defInfo.mission) {
+            task_list = [];
+            for (task <- miss.taskList) {
+                task_items = [];
+                if (task.activityType == "TRIGGER") {
+                    for (trigger <- task.activityList) {
+                        tmp_ret = extractComponentFromId(tm, trigger, trigger_map);
+                        trigger_map = tmp_ret[1];
+                        task_items += generateFromDefInfo(tmp_ret[0], generateTrigger);
+                    }
+                    if (task.activityListMod != "ALLORD")   task_items = toList(toSet(task_items));
+                }
+                else if (task.activityType == "ACTION") {
+                    for (action <- task.activityList) {
+                        tmp_ret = extractComponentFromId(tm, action, action_map);
+                        action_map = tmp_ret[1];
+                        task_items += tmp_ret[0];
+                    }
+                }
+                task_list += <task_items, task.activityType, task.activityListMod>;
 
-        states_check += "
-        'if self.task_list[self.counter_task]():
-        '\tself.counter_task += 1
-        'if self.counter_task == <size(task_list)>:
-        '\tTASK_REGISTRY.update(\"ALLORD\", True)
-        '";
-
+            }
+            retVal += "<printMissionTaskBhv(task_list, "<mission>")>";
+        }
     }
+    return intercalate("\n\n", retVal);
+}
+
+str printMissionTaskBhv(list[tuple[list[value], str, str]] task_list, mission_name) {
+    
+    list[str] states_init_reg = [];
+    list[str] states_init_conds = [];
+    list[int] action_states_index = [];
+    list[list[DefInfo]] action_task_list = [];
+    int state_cont = 0;
+
+
+    for (task <- task_list) {
+        list[value] task_items = task[0];
+        task_type = task[1];
+        task_list_mod = task[2];
+
+        if (task_type == "TRIGGER") {
+            if (task_list_mod == "ANY" || task_list_mod == "SIM") {
+                states_init_conds += "[lambda: <printTriggers(task_items, task_list_mod)>]";
+                states_init_reg += "TASK_REGISTRY.add(\"state_<state_cont>\", 1)";
+                state_cont += 1;
+            }
+            else if (task_list_mod == "ALL") {
+                states_init_conds += "<printListLambda(task_items)>";
+                states_init_reg += "TASK_REGISTRY.add(\"state_<state_cont>\", <size(task_items)>)";
+                state_cont += 1;
+            }
+            else {
+                for (trigger <- task_items) {
+                    states_init_conds += "[lambda: <trigger>]";
+                    states_init_reg += "TASK_REGISTRY.add(\"state_<state_cont>\", 1)";
+                    state_cont += 1;
+                }
+            }
+        }
+        else if (task_type == "ACTION") {
+            states_init_reg += "TASK_REGISTRY.add(\"state_<state_cont>\", 1)";
+            states_init_conds += "[lambda: RUNNING_ACTIONS_DONE]";
+            action_task_list += [task_items];
+            action_states_index += state_cont;
+            state_cont += 1;
+        }
+    }
+
+    list[str] states_init = states_init_reg + "self.task_list_cond = [<intercalate(", ", states_init_conds)>]";
+    states_check = "for i in range(len(self.task_list_cond[EXECUTING_STATE])):
+    '\tTASK_REGISTRY.update(\"state_\" + str(EXECUTING_STATE), self.task_list_cond[EXECUTING_STATE][i](), i)
+    'if TASK_REGISTRY.task_done(\"state_\" + str(EXECUTING_STATE)):
+    '\tEXECUTING_STATE += 1
+    '\tRUNNING_ACTIONS_DONE = False
+    '";
 
     retVal = "
     'class <mission_name>_updateTasksBhv(Behavior):
     '\tdef __init__(self):
     '\t\tBehavior.__init__(self)
+    '\t\tEXECUTING_STATE = 0
+    '\t\tself.fired = False
     '\t\t<intercalate("\n", states_init)>
     '
     '\tdef check(self):
-    '\t\t<intercalate("\n", states_check)>
+    '\t\tif not self.fired:
+    '\t\t\t<states_check>
+    '\t\t\tif EXECUTING_STATE == <state_cont>:
+    '\t\t\t\tself.fired = True
+    '\t\t\t\treturn True
     '\t\treturn False
     '
     '\tdef action(self):
@@ -249,34 +324,82 @@ str printTaskBhv(list[value] task_list, task_list_mod, mission_name) {
     '
     '\tdef suppress(self):
     '\t\tpass
+    '
     '";
+    retVal +=  printMissionRunningBhv(action_task_list, action_states_index, state_cont, mission_name) + "\n\n";
     return retVal;
 }
 
-str generateMissionsDef(missions, tm, trigger_map) {
-    retVal = [];
-    for (<mission> <- {<id> |/(ID) `<ID id>` := missions}) {
-        DefInfo defInfo = findReference(tm, mission);
-        if (miss <- defInfo.mission) {
-            task_list = [];
-            for (trigger <- miss.taskList) {
-                tmp_ret = extractComponentFromId(tm, trigger, trigger_map, generateTrigger);
-                task_list += tmp_ret[0];
-                trigger_map = tmp_ret[1];
+str printMissionRunningBhv(list[list[DefInfo]] action_task, list[int] action_states_index, int max_state_index, mission_name) {
+    list[str] operations_init = [];
+    list[str] log_operations_init = [];
+    int j = 0;
+    for (int i <- [0 .. max_state_index]) {
+        if (i in action_states_index) {
+            operations = [];
+            log_operations = [];
+            for (action <- action_task[j]) {
+                tmp_ret = generateActionTask(action);
+                operations += tmp_ret[0];
+                log_operations += tmp_ret[1];
             }
-
-            if (miss.taskListMod != "ALLORD")   task_list = toList(toSet(task_list));
-
-
-            retVal += "<printTaskBhv(task_list, miss.taskListMod, "<mission>")>";
+            operations_init += printListLambda(operations);
+            log_operations_init += printListLambda(log_operations);
+            j += 1;
+        }
+        else {
+            operations_init += ["[lambda: ()]"];
+            log_operations_init += ["[lambda: ()]"];
         }
     }
-    return intercalate("\n", retVal);
+
+
+    action_update = "
+    'for operation, log_operation in zip(self.operations[EXECUTING_STATE][self.counter_action:], self.log_operations[EXECUTING_STATE][self.counter_action:]):
+    '\toperation()
+    '\twhile self.motor.is_running and not self.supressed:
+    '\t\tpass
+    '\tif not self.supressed:
+    '\t\tlog_operation()
+    '\t\tself.counter_action += 1
+    '
+    'if self.counter_action == len(self.operations[EXECUTING_STATE]):
+    '\tRUNNING_ACTIONS_DONE = True
+    '\tself.counter_action = 0
+    '\treturn True
+    'return False
+    '";
+    
+    retVal = "
+    'class <mission_name>_RunningBhv(Behavior):
+    '\tdef __init__(self):
+    '\t\tBehavior.__init__(self)
+    '\t\tself.counter_action = 0
+    '\t\tRUNNING_ACTIONS_DONE = False
+    '\t\tself.operations = [<intercalate(", ", operations_init)>]
+    '\t\tself.log_operations = [<intercalate(", ", log_operations_init)>]
+    '
+    '\tdef check(self):
+    '\t\treturn not TASK_REGISTRY.tasks_done() and not RUNNING_ACTIONS_DONE
+    '
+    '\tdef action(self):
+    '\t\t<action_update>
+    '
+    '\tdef suppress(self):
+    '\t\tself.motor.stop()
+    '\t\tself.supressed = True
+    '\t\tif DEBUG:
+    '\t\t\ttimedlog(\"RunningBhv suppressed\")
+    '\t\tpass
+    '";
+    
+    return retVal;
 }
+
 
 str printMissionsUsage(missions, tm) {
     retVal = [];
-    for (<mission> <- {<id> |/(ID) `<ID id>` := missions}) {
+    for (<mission> <- [<id> |/(ID) `<ID id>` := missions]) {
         DefInfo defInfo = findReference(tm, mission);
         if (miss <- defInfo.mission) {
             retVal += "CONTROLLER = Controller(return_when_no_action=True)
@@ -347,10 +470,47 @@ list[str] generateAction(DefInfo defInfo) {
     return ["()"];
 }
 
+tuple[list[str], list[str]] generateActionTask(DefInfo defInfo) {
+    operations = [];
+    log_operations = [];
+    if (ma <- defInfo.moveAction) {
+        if (ma.direction == "stop") return <["MOTOR.stop()"], ["()"]>;
+        else {
+            base_distance = 30;
+            for (int i <- [0, base_distance .. ma.distance]) {
+                distance = min(base_distance, ma.distance - i);
+                if (ma.direction == "forward") operations += ["MOTOR.run(forward=True, distance=<distance>, speed=<ma.speed>)"];
+                if (ma.direction == "backward") operations += ["MOTOR.run(forward=False, distance=<distance>, speed=<ma.speed>)"];
+                log_operations += "MOTOR.log_distance(<distance>)";
+            }
+            return <operations, log_operations>;
+        }
+    }
+    if (ta <- defInfo.turnAction) {
+        base_angle = 30;
+        for (int i <- [0, base_angle .. ta.angle]) {
+            angle = min(base_angle, ta.angle - i);
+            if (ta.direction == "left") operations += ["MOTOR.turn(direction=\"LEFT\", degrees=<angle>, speed=<ta.speed>)"];
+            if (ta.direction == "right") operations += ["MOTOR.turn(direction=\"RIGHT\", degrees=<angle>, speed=<ta.speed>)"];
+            if (ta.direction == "none") operations += ["MOTOR.turn(direction=\"None\", degrees=<angle>, speed=<ta.speed>)"];
+            log_operations += "MOTOR.log_angle(<angle>)";
+        }
+        return <operations, log_operations>;
+    }
+    operations += generateAction(defInfo);
+    return <operations, ["()" | i <- [0 .. size(operations)]]>;
+}
+
+list[str] generateFromDefInfo(list[DefInfo] defInfoList, list[str](DefInfo) generator_method) {
+    retVal = [];
+    for (defInfo <- defInfoList) {
+        retVal += generator_method(defInfo);
+    }
+    return retVal;
+}
 
 
-
-tuple[list[str], map[str, list[str]]] extractComponentFromId(tm, startIdSrc, map[str, list[str]] ret_map, list[str](DefInfo) generator_method) {
+tuple[list[DefInfo], map[str, list[DefInfo]]] extractComponentFromId(tm, startIdSrc, map[str, list[DefInfo]] ret_map) {
     retVal = [];
     component_str = getContent(startIdSrc);
 
@@ -361,311 +521,19 @@ tuple[list[str], map[str, list[str]]] extractComponentFromId(tm, startIdSrc, map
     DefInfo defInfo = findReferenceFromSrc(tm, startIdSrc);
     if (l <- defInfo.idList) {
         for (idSrc <- l.idList) {
-            tmp_ret = extractComponentFromId(tm, idSrc, ret_map, generator_method);
+            tmp_ret = extractComponentFromId(tm, idSrc, ret_map);
             retVal += tmp_ret[0];
             ret_map = tmp_ret[1];
         }
     }
-    else retVal += generator_method(defInfo);
+    else retVal += defInfo;
 
     ret_map += (component_str: retVal);
     return <retVal, ret_map>;
 }
 
-// tuple[list[str], map[str, list[str]]] extractActionFromId(tm, startIdSrc, map[str, list[str]] action_map) {
-//     retVal = [];
-//     action_str = getContent(startIdSrc);
 
-//     if (action_str in action_map) {
-//         retVal += action_map[action_str];
-//         return <retVal, action_map>;
-//     }
-//     DefInfo defInfo = findReferenceFromSrc(tm, startIdSrc);
-//     if (l <- defInfo.idList) {
-//         for (idSrc <- l.idList) {
-//             tmp_ret = extractActionFromId(tm, idSrc, action_map);
-//             retVal += tmp_ret[0];
-//             action_map = tmp_ret[1];
-//         }
-//     }
-//     else retVal += generateAction(defInfo);
-
-//     action_map += (action_str: retVal);
-//     return <retVal, action_map>;
-// }
-
-// str printTriggerIDList(idList) {
-//     retVal = [];
-//     for (<id> <- {<id> |/(ID) `<ID id>` := idList}) {
-//         retVal += "<id>()";
-//     }
-//     return intercalate(" and ", retVal);
-// }
-
-// str printTriggerIDList(idList, listMod) {
-//     retVal = [];
-//     for (<id> <- {<id> |/(ID) `<ID id>` := idList}) {
-//         retVal += "<id>()";
-//     }
-//     if ("<listMod>" == "ANY")
-//         return intercalate(" or ", retVal);
-//     else 
-//         return intercalate(" and ", retVal);
-// }
-
-// // str printBehaviorIDList(idList) {
-// //     retVal = [];
-// //     for (<id> <- {<id> |/(ID) `<ID id>` := idList}) {
-// //         retVal += "CONTROLLER.ADD(<id>())";
-// //     }
-// //     return intercalate("\n", retVal);
-// // }
-
-// // str printActionIDList(idList, for_bhv) {
-// //     retVal = [];
-// //     if (for_bhv == false){
-// //         for (<id> <- {<id> |/(ID) `<ID id>` := idList}) {
-// //         retVal += "<id>()";
-// //     }
-// //     }
-// //     else {
-// //         for (<id> <- {<id> |/(ID) `<ID id>` := idList}) {
-// //             retVal += "if not self.suppressed:
-// //             '\t<id>()
-// //             '\twhile MOTOR.is_running and not self.supressed:
-// //             '\t\tpass
-// //             ";
-// //         }
-// //     }
-// //     return intercalate("\n\t", retVal);
-// // }
-
-// str printTriggerDef(ast) {
-//     retVal = [];
-//     for (<id, t> <- {<idNew, roverTrigger> | /(Trigger) `<ID idNew> <TriggerAssignment triggerAssignment> <RoverTrigger roverTrigger>` := ast}) {
-//         retVal += "def <id>(): <printTriggerCode(t)>";
-//     }
-//     for (<id, l> <- {<idNew, idList> | /(Trigger) `<ID idNew> <TriggerAssignment triggerAssignment> <IDList idList>` := ast}) {
-//         retVal += "def <id>():\n\treturn <printTriggerIDList(l)>";
-//     }
-//     return intercalate("\n", retVal);
-// }
-
-
-// str printTriggerCode(trigger) {
-//     if(/(ColorTrigger)`COLOR <ColorReadable color>` := trigger) return "return read_color_sensor(CS) == \"<color>\"";
-//     if(/(DistanceTrigger)`INDISTANCE <NATURAL distance>` := trigger) return "return read_distance_sensor(ULT_S) \<= <distance>";
-// //     if(/(TouchTrigger)`TOUCH <TouchSensor touchSensor>`:= trigger) {
-// //         if(/(TouchSensor)`right` := touchSensor) return "return read_touch_sensor(TOUCH_R)";
-// //         if(/(TouchSensor)`left` := touchSensor) return "return read_touch_sensor(TOUCH_L)";
-// //         if(/(TouchSensor)`any` := touchSensor) return "return read_touch_sensor(TOUCH_R) or read_touch_sensor(TOUCH_L)";
-// //     }
-//     return "return False";
-// }
-
-
-// // str printActionDef(ast) {
-// //     retVal = [];
-// //     for (<id, a> <- {<idNew, roverAction> | /(Action) `<ID idNew> <ActionAssignment actionAssignment> <RoverAction roverAction>` := ast}) {
-// //         retVal += "def <id>(): <printRoverAction(a)>";
-// //     }
-// //     for (<id, l> <- {<idNew, idList> | /(Action) `<ID idNew> <ActionAssignment actionAssignment> <IDList idList>` := ast}) {
-// //         retVal += "def <id>():\n\t<printActionIDList(l, false)>";
-// //     }
-// //     return intercalate("\n", retVal);
-// // }
-
-// // // str printRoverAction(action) {
-// // //     if(/(MoveAction)`FORWARD <NATURAL distance>` := action) return "MOTOR.run(rotations=<distance>)";
-// // //     if(/(MoveAction)`BACKWARD <NATURAL distance>` := action) return "MOTOR.run(forward=False, rotations=<distance>)";
-// // //     if(/(TurnAction)`TURN <ANGLE angle>` := action) return "MOTOR.turn(direction=<angle>)"; // implement the conversion from [-180;180] to [-100; 100]
-// // //     if(/(SpeakAction)`SPEAK <STR text>` := action) return "S.speak(<text>)";
-// // //     if(/(SpeakAction)`BEEP` := action) return "S.beep()";
-// // //     if(/(LedAction)`LED <ColorWritable color>` := action) return "set_led(LEDS, \"<color>\")";
-// // //     return "";
-// // // }
-
-
-// // str printBehaviorDef(ast) {
-// //     retVal = [];
-// //     for (<b, t, a> <- {<idBhv, idTrig, idAct> | /(Behavior) `Behavior: <ID idBhv> WHEN <ID idTrig> DO <ID idAct>` := ast}) {
-// //         retVal += "
-// //         'class <b>(Behavior):
-// //         '\tdef __init__(self):
-// //         '\t\tBehavior.__init__(self)
-// //         '\t\tself.has_fired = False
-// //         '\t\tself.suppresed = False
-// //         '
-// //         '\tdef check(self):
-// //         '\t\tself.has_fired = <t>()
-// //         '\t\treturn self.has_fired
-// //         '
-// //         '\tdef action(self):
-// //         '\t\tself.suppresed = False
-// //         '\t\t<a>()
-// //         '\t\twhile MOTOR.is_running and not self.supressed:
-// //         '\t\t\tpass
-// //         '\t\tif not self.supressed:
-// //         '\t\t\treturn True
-// //         '\t\telse:
-// //         '\t\t\ttimedlog(\"<b> suppressed\")
-// //         '\t\t\treturn False
-// //         '
-// //         '\tdef suppress(self):
-// //         '\t\tMOTOR.stop()
-// //         '\t\tself.supressed = True
-// //         '";
-// //     }
-// //     for (<b, t, la> <- {<idBhv, idTrig, listAction> | /(Behavior) `Behavior: <ID idBhv> WHEN <ID idTrig> DO <IDList listAction>` := ast}) {
-// //         retVal += "
-// //         'class <b>(Behavior):
-// //         '\tdef __init__(self):
-// //         '\t\tBehavior.__init__(self)
-// //         '\t\tself.has_fired = False
-// //         '\t\tself.suppresed = False
-// //         '
-// //         '\tdef check(self):
-// //         '\t\tself.has_fired = <t>()
-// //         '\t\treturn self.has_fired
-// //         '
-// //         '\tdef action(self):
-// //         '\t\tself.suppresed = False
-// //         '\t\t<printActionIDList(la, true)>
-// //         '\t\tif not self.supressed:
-// //         '\t\t\treturn True
-// //         '\t\telse:
-// //         '\t\t\ttimedlog(\"<b> suppressed\")
-// //         '\t\t\treturn False
-// //         '
-// //         '\tdef suppress(self):
-// //         '\t\tMOTOR.stop()
-// //         '\t\tself.supressed = True
-// //         '";
-// //     }
-// //     for (<b, lm, lt, a> <- {<idBhv, listMod, listTrig, idAct> | /(Behavior) `Behavior: <ID idBhv> WHEN <ListMod listMod> <IDList listTrig> DO <ID idAct>` := ast}) {
-// //         retVal += "
-// //         'class <b>(Behavior):
-// //         '\tdef __init__(self):
-// //         '\t\tBehavior.__init__(self)
-// //         '\t\tself.has_fired = False
-// //         '\t\tself.suppresed = False
-// //         '
-// //         '\tdef check(self):
-// //         '\t\tself.has_fired = <printTriggerIDList(lt, lm)>
-// //         '\t\treturn self.has_fired
-// //         '
-// //         '\tdef action(self):
-// //         '\t\tself.suppresed = False
-// //         '\t\t<a>()
-// //         '\t\twhile MOTOR.is_running and not self.supressed:
-// //         '\t\t\tpass
-// //         '\t\tif not self.supressed:
-// //         '\t\t\treturn True
-// //         '\t\telse:
-// //         '\t\t\ttimedlog(\"<b> suppressed\")
-// //         '\t\t\treturn False
-// //         '
-// //         '\tdef suppress(self):
-// //         '\t\tMOTOR.stop()
-// //         '\t\tself.supressed = True
-// //         '";
-// //     }
-// //     for (<b, lm, lt, la> <- {<idBhv, listMod, listTrig, lAct> | /(Behavior) `Behavior: <ID idBhv> WHEN <ListMod listMod> <IDList listTrig> DO <IDList lAct>` := ast}) {
-// //         retVal += "
-// //         'class <b>(Behavior):
-// //         '\tdef __init__(self):
-// //         '\t\tBehavior.__init__(self)
-// //         '\t\tself.has_fired = False
-// //         '\t\tself.suppresed = False
-// //         '
-// //         '\tdef check(self):
-// //         '\t\tself.has_fired = <printTriggerIDList(lt, lm)>
-// //         '\t\treturn self.has_fired
-// //         '
-// //         '\tdef action(self):
-// //         '\t\tself.suppresed = False
-// //         '\t\t<printActionIDList(la, true)>
-// //         '\t\tif not self.supressed:
-// //         '\t\t\treturn True
-// //         '\t\telse:
-// //         '\t\t\ttimedlog(\"<b> suppressed\")
-// //         '\t\t\treturn False
-// //         '
-// //         '\tdef suppress(self):
-// //         '\t\tMOTOR.stop()
-// //         '\t\tself.supressed = True
-// //         '";
-// //     }
-// //     return intercalate("\n", retVal);
-// // }
-
-
-// // str printTaskBhv(task_cond, name) {
-// //     retVal = "TASK_REGISTRY.add(<name>)
-// //     'class Update<name>(Behavior):
-// //     '\tdef __init__(self):
-// //     '\t\tBehavior.__init__(self)
-// //     '
-// //     '\tdef check(self):
-// //     'return not TASK_REGISTRY.get(<name>) and <task_cond>();
-// //     '
-// //     '\tdef action(self):
-// //     '\t\tTASK_REGISTRY.set(<name>, True)
-// //     '\t\treturn True
-// //     '
-// //     '\tdef suppress(self):
-// //     '\t\tpass
-// //     '";
-// //     return retVal;
-// // }
-
-// // str printTaskListBhv(task_list, list_mod, name) {
-// //     retVal = "TASK_REGISTRY.add(<name>)
-// //     'class Update<name>(Behavior):
-// //     '\tdef __init__(self):
-// //     '\t\tBehavior.__init__(self)
-// //     '
-// //     '\tdef check(self):
-// //     'return not TASK_REGISTRY.get(<name>) and <printTriggerIDList(task_list, list_mod)>;
-// //     '
-// //     '\tdef action(self):
-// //     '\t\tTASK_REGISTRY.set(<name>, True)
-// //     '\t\treturn True
-// //     '
-// //     '\tdef suppress(self):
-// //     '\t\tpass
-// //     '";
-// //     return retVal;
-// // }
-
-// // str printMissionDef(ast) {
-// //     retVal = [];
-// //     name = "main";
-// //     for (<t, b> <- {<idTask, idBhv> | /(Mission) `Mission: <ID idTask> WHILE <ID idBhv>` := ast}) {
-// //         // retVal += "<printTaskBhv(t, name)>
-// //         // 'CONTROLLER.add(<b>())
-// //         // 'CONTROLLER.add(Update<name>())
-// //         // ";
-// //         retVal += "AAAAA";
-// //     }
-// //     for (<t, lb> <- {<idTask, listBhv> | /(Mission) `Mission: <ID idTask> WHILE <IDList listBhv>` := ast}) {
-// //         retVal += "<printTaskBhv(t, name)>
-// //         '<printBehaviorIDList(lb)>
-// //         'CONTROLLER.add(Update<name>())
-// //         ";
-// //     }
-// //     for (<lm, lt, b> <- {<listMod, listTask, idBhv> | /(Mission) `Mission: <ListMod listMod> <IDList listTask> WHILE <ID idBhv>` := ast}) {
-// //         retVal += "<printTaskListBhv(lt, lm, name)>
-// //         'CONTROLLER.add(<b>())
-// //         'CONTROLLER.add(Update<name>())
-// //         ";
-// //     }
-// //     for (<lm, lt, lb> <- {<listMod, listTask, listBhv> | /(Mission) `Mission: <ListMod listMod> <IDList listTask> WHILE <IDList listBhv>` := ast}) {
-// //         retVal += "<printTaskListBhv(lt, lm, name)>
-// //         '<printBehaviorIDList(lb)>
-// //         'CONTROLLER.add(Update<name>())
-// //         ";
-// //     }
-// //     return intercalate("\n", retVal);
-// // }
-
+int min(int a, int b) {
+    if (a < b) return a;
+    return b;
+}

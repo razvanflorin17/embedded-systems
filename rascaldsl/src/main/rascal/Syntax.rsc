@@ -14,10 +14,7 @@ syntax RoverConfig  //W.I.P.
     = new: "Rover:" IDList missions "MAC:" STR macAddress 
 ;
 
-syntax Mission
-    = newSingle: "Mission:" ID id "EXECUTE" ID task "WHILE" (ID | IDList) behaviors
-    | newMulti: "Mission:" ID id "EXECUTE" ListMod? listMod IDList taskList "WHILE" (ID | IDList) behaviors
-;
+syntax Mission = "Mission:" ID id "EXECUTE" (Task | TaskList) tasks "WHILE" (ID | IDList) behaviors;
 
 syntax Behavior
     = newSingleTrigger: "Behavior:" ID id "WHEN" ID trigger "DO" (ID | IDList) action
@@ -98,10 +95,25 @@ syntax IDList
     | implicit: ID id '+' {ID '+'}+
 ;
 
+
+
 syntax ListMod
     = "ANY"
     | "ALL"
     | "ALLORD"
+    | "SIM" // stand for "SIMULTANEOUS"
+;
+
+syntax Task 
+    = triggerListTask: '{' ListMod? listMod IDList triggerIdList '}'
+    | triggerId: '{' ID idTrigger '}'
+    | actionListTask: IDList actionIdList
+    | actionTask: ID idAction
+;
+
+syntax TaskList 
+    = explicit: '[' {Task ','}+ ']'
+    | implicit: Task task '+' {Task '+'}+
 ;
 
 syntax DistanceUnit = "cm" | "m" | "mm" | "dm"; 

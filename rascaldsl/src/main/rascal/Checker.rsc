@@ -53,7 +53,8 @@ data LedAction = ledAction(str color = "");
 data MeasureAction = measureAction(int time=1);
 
 data Behavior = behavior(list[loc] triggerList = [], list[loc] actionList = [], str triggerListMod="ALL");
-data Mission = mission(list[loc] taskList = [], list[loc] behaviorList = [], str taskListMod="ALL");
+data Task = task(list[loc] activityList = [], str activityType="TRIGGER", str activityListMod="ALL");
+data Mission = mission(list[Task] taskList = [], list[loc] behaviorList = []);
 
 
 // ADT constructors
@@ -103,7 +104,7 @@ private TypePalConfig getModulesConfig() = tconfig(
 // helper methods
 
 void checkIdList(Solver s, idCheckList, list[AType] validTypes, list[str] excludedIds) {
-     for (<id> <- {<id> |/(ID) `<ID id>` := idCheckList}) {
+     for (<id> <- [<id> |/(ID) `<ID id>` := idCheckList]) {
           s.requireFalse(("<id>" in excludedIds), error(id, "%v is excluded", "<id>"));
           s.requireTrue((s.getType(id) in validTypes), error(id,  "type should be one of %v, instead of %t", validTypes, id));
      }
@@ -111,7 +112,7 @@ void checkIdList(Solver s, idCheckList, list[AType] validTypes, list[str] exclud
 
 list[loc] collectIdList(Collector c, idCollectList, role) {
      result = [];
-     for (<id> <- {<id> |/(ID) `<ID id>` := idCollectList}) {
+     for (<id> <- [<id> |/(ID) `<ID id>` := idCollectList]) {
           result +=  id.src;
           c.use(id, {role});
      }
@@ -376,7 +377,10 @@ void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ListMod? listMod> <I
      });
 
      listMod_value = "ALL";
-     if(current has listMod) listMod_value = "<listMod>";
+     if(current has listMod)  {
+          listMod_value = "<listMod>";
+          if (listMod_value == "SIM") listMod_value = "ALL";
+     }
 
      dt = defType(behaviorType());
      dt.behavior = [behavior(triggerList=triggerList, actionList=[idAction.src], triggerListMod=listMod_value)];
@@ -404,7 +408,10 @@ void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ListMod? listMod> <I
      });
 
      listMod_value = "ALL";
-     if(current has listMod) listMod_value = "<listMod>";
+     if(current has listMod)  {
+          listMod_value = "<listMod>";
+          if (listMod_value == "SIM") listMod_value = "ALL";
+     }
      
      dt = defType(behaviorType());
      dt.behavior = [behavior(triggerList=triggerList, actionList=actionList, triggerListMod=listMod_value)];
@@ -412,58 +419,85 @@ void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ListMod? listMod> <I
 }
 
 
+// task
+Task collectTask(Collector c, task_in) {
+     if(/(Task) `<ID idAction>` := task_in) {
+          c.use(idAction, {actionId()});
+          return task(activityList=[idAction.src], activityListMod="ALL", activityType="ACTION");
+     } 
+     if (/(Task) `{<ID idTrigger>}` := task_in) {
+          c.use(idTrigger, {triggerId()});
+          return task(activityList=[idTrigger.src], activityListMod="ALL", activityType="TRIGGER");
+     }
+     if (/(Task) `<IDList actionIdList>` := task_in) {
+          actionList = collectIdList(c, actionIdList, actionId());
+          collect(actionIdList, c);
+          return task(activityList=actionList, activityListMod="ALL", activityType="ACTION");
+     }
+     if (/(Task) `{<IDList triggerIdList>}` := task_in) {
+          triggerList = collectIdList(c, triggerIdList, triggerId());
+          collect(triggerIdList, c);
+          return task(activityList=triggerList, activityListMod="ALL", activityType="TRIGGER");
+     }
+     if (/(Task) `{<ListMod listMod> <IDList triggerIdList>}` := task_in) {
+          triggerList = collectIdList(c, triggerIdList, triggerId());
+          collect(triggerIdList, c);
+          return task(activityList=triggerList, activityListMod="<listMod>", activityType="TRIGGER");
+     }
+
+     return task(activityList=[], activityListMod="ALL", activityType="ACTION");
+}
+
 // mission
 
 //definitions
-// 1 trigger, 1 action
-void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <ID idTask> WHILE <ID idBhv>`,  Collector c) {
-     c.use(idTask, {triggerId()});
+// 1 task, 1 bhv
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <Task task> WHILE <ID idBhv>`,  Collector c) {
+     task_res = collectTask(c, task);
      c.use(idBhv, {behaviorId()});
      dt = defType(missionType());
-     dt.mission = [mission(taskList=[idTask.src], behaviorList=[idBhv.src], taskListMod="ALL")];
+     dt.mission = [mission(taskList=[task_res], behaviorList=[idBhv.src])];
      c.define("<idNew>", missionId(), idNew, dt);
 }
 
-// 1 trigger, n action
-void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <ID idTask> WHILE <IDList idBhvs>`,  Collector c) {
-     c.use(idTask, {triggerId()});
+// 1 task, n bhv
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <Task task> WHILE <IDList idBhvs>`,  Collector c) {
+     task_res = collectTask(c, task);
 
      behaviorList = collectIdList(c, idBhvs, behaviorId());
      collect(idBhvs, c);
 
      dt = defType(missionType());
-     dt.mission = [mission(taskList=[idTask.src], behaviorList=behaviorList,  taskListMod="ALL")];
+     dt.mission = [mission(taskList=[task_res], behaviorList=behaviorList)];
      c.define("<idNew>", missionId(), idNew, dt);
 }
 
-// n trigger, 1 action
-void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <ListMod? listMod> <IDList idTasks> WHILE <ID idBhv>`,  Collector c) {
+// n task, 1 bhv
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <TaskList tasks> WHILE <ID idBhv>`,  Collector c) {
      c.use(idBhv, {behaviorId()});
 
-     taskList = collectIdList(c, idTasks, triggerId());
-     collect(idTasks, c);
-
-     listMod_value = "ALL";
-     if(current has listMod) listMod_value = "<listMod>";   
+     taskList_res = [];
+     for (task_in <- [task_in |/(Task) `<Task task_in>` := tasks]) {
+          taskList_res += collectTask(c, task_in);
+     } 
 
      dt = defType(missionType());
-     dt.mission = [mission(taskList=taskList, behaviorList=[idBhv.src], taskListMod=listMod_value)];
+     dt.mission = [mission(taskList=taskList_res, behaviorList=[idBhv.src])];
      c.define("<idNew>", missionId(), idNew, dt);
 }
 
-// n trigger, n action
-void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <ListMod? listMod> <IDList idTasks> WHILE <IDList idBhvs>`,  Collector c) {
+// n task, n bhv
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <TaskList tasks> WHILE <IDList idBhvs>`,  Collector c) {
      behaviorList = collectIdList(c, idBhvs, behaviorId());
      collect(idBhvs, c);
 
-     taskList = collectIdList(c, idTasks, triggerId());
-     collect(idTasks, c);
-
-     listMod_value = "ALL";
-     if(current has listMod) listMod_value = "<listMod>";
+     taskList_res = [];
+     for (task_in <- [task_in |/(Task) `<Task task_in>` := tasks]) {
+          taskList_res += collectTask(c, task_in);
+     }
 
      dt = defType(missionType());
-     dt.mission = [mission(taskList=taskList, behaviorList=behaviorList, taskListMod=listMod_value)];
+     dt.mission = [mission(taskList=taskList_res, behaviorList=behaviorList)];
      c.define("<idNew>", missionId(), idNew, dt);
 }
 

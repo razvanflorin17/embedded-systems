@@ -59,6 +59,8 @@ class Motor():
     def __init__(self, motor, base_speed=BASE_SPEED):
         self.motor = motor
         self.base_speed = base_speed
+        self.log_distance = 0
+        self.log_angle = 0
 
     def run(self, forward=True, distance=10, speed=None, speedM=None, block=False, brake=False):
         """Runs the motor for a certain distance (cm)"""
@@ -90,6 +92,22 @@ class Motor():
 
     def stop(self):
         self.motor.stop()
+
+    def log_reset(self):
+        self.log_distance = 0
+        self.log_angle = 0
+    
+    def log_distance(self, distance):
+        self.log_distance += distance
+    
+    def log_angle(self, angle):
+        self.log_angle += angle
+    
+    def get_log_distance(self):
+        return self.log_distance
+    
+    def get_log_angle(self):
+        return self.log_angle
 
     @property
     def is_running(self):
@@ -133,20 +151,23 @@ class TaskRegistry():
     def __init__(self):
         self.tasks = {}
 
-    def add(self, task_name):
-        self.tasks[task_name] = False
+    def add(self, task_name, n_trigger=1):
+        self.tasks[task_name] = [False] * n_trigger
 
-    def set(self, task_name, value):
-        self.tasks[task_name] = value
+    def set(self, task_name, value, trigger_index=0):
+        self.tasks[task_name][trigger_index] = value
 
-    def update(self, task_name, value):
-        self.tasks[task_name] = max(self.tasks[task_name], value)
+    def update(self, task_name, value, trigger_index=0):
+        self.tasks[task_name][trigger_index] = max(self.tasks[task_name][trigger_index], value)
 
-    def get(self, task_name):
-        return self.tasks[task_name]
+    def get(self, task_name, trigger_index=0):
+        return self.tasks[task_name][trigger_index] if trigger_index is not None else self.tasks[task_name]
     
-    def tasks_done(self):
-        return all(self.tasks.values())
+    def task_done(self, task_name):
+        return all(self.tasks[task_name].values())
+
+    def all_tasks_done(self):
+        return all([self.task_done(task_name) for task_name in self.tasks])
     
     def reset(self):
         self.tasks = {}

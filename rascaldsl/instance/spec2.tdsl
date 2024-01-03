@@ -1,3 +1,5 @@
 ta == COLOR mid black
+aa := FORWARD 1 30
 
-tb == [ta]
+[{ANY [ta, aa]} , {ALLORD [aa]}, aa, [ta, aa]]
+

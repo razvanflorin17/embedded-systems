@@ -2,28 +2,30 @@ ta == COLOR mid black
 tb == COLOR left black
 
 tc == INDISTANCE front 10
+te == TOUCH left
 
 td == ta + tc + tb
-tE == ta + td
+tddadad == ta + tc + tb
 
 aa := FORWARD 1 30
 ab := LEFT 90° 30
 ac := BEEP
 af := MEASURE 10h
 
-ad := aa + ab
+ad := aa + ac + ab
 
 
 Behavior: ba WHEN ta DO aa
-Behavior: bb WHEN ALLORD [ta, ta] DO [aa, ac]
+Behavior: bb WHEN ALL [te, td] DO [aa, ac]
 Behavior: bc WHEN ANY [ta, tb, tc] DO ad
 Behavior: bd WHEN [ta, td] DO [ad, aa, af, ad]
 
 
 
-Mission: ma EXECUTE ta WHILE bb
-Mission: mb EXECUTE ta WHILE [ba, bb]
-Mission: mc EXECUTE ALLORD [ta, tb, tc] WHILE ba
-Mission: md EXECUTE ANY [ta, tb] WHILE [ba, bb, bd, bc]
+Mission: ma EXECUTE [{ANY [td, te]}, ad] WHILE ba + bb + bc + bd
+Mission: mb EXECUTE {ta} WHILE [ba, bb]
+Mission: mc EXECUTE [{[ta, tb]}, {tc}] WHILE ba
+Mission: md EXECUTE [{ta}, {tb}] WHILE [ba, bb, bd, bc]
 
-Rover: [ma, mb, mc] MAC: "211"
+
+Rover: [ma, mb, ma, mb, md] MAC: "211"
