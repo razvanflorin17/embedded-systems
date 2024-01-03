@@ -7,8 +7,10 @@ te == TOUCH left
 td == ta + tc + tb
 tddadad == ta + tc + tb
 
-aa := FORWARD 1 30
-ab := LEFT 90° 30
+aa := FORWARD 10 30
+ab := RIGHT 90° 30
+abb := LEFT 45° 30
+aaa := FORWARD 30 10
 ac := BEEP
 af := MEASURE 10h
 
@@ -22,7 +24,7 @@ Behavior: bd WHEN [ta, td] DO [ad, aa, af, ad]
 
 
 
-Mission: ma EXECUTE [{ANY [td, te]}, ad] WHILE ba + bb + bc + bd
+Mission: ma EXECUTE [{ANY [td, te]}, [aa, aa, ab, aa, abb, aaa]] WHILE ba + bb + bc + bd
 Mission: mb EXECUTE {ta} WHILE [ba, bb]
 Mission: mc EXECUTE [{[ta, tb]}, {tc}] WHILE ba
 Mission: md EXECUTE [{ta}, {tb}] WHILE [ba, bb, bd, bc]

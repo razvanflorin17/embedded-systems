@@ -2,7 +2,7 @@
 
 "211"
 
-[|file:///h:/Altri%20computer/Il%20mio%20laptop/dsl_project/final/embedded-systems/rascaldsl/instance/spec1.tdsl|(459,2,<25,52>,<25,54>),|file:///h:/Altri%20computer/Il%20mio%20laptop/dsl_project/final/embedded-systems/rascaldsl/instance/spec1.tdsl|(464,2,<25,57>,<25,59>),|file:///h:/Altri%20computer/Il%20mio%20laptop/dsl_project/final/embedded-systems/rascaldsl/instance/spec1.tdsl|(469,2,<25,62>,<25,64>),|file:///h:/Altri%20computer/Il%20mio%20laptop/dsl_project/final/embedded-systems/rascaldsl/instance/spec1.tdsl|(454,2,<25,47>,<25,49>)]
+[|file:///h:/Altri%20computer/Il%20mio%20laptop/dsl_project/final/embedded-systems/rascaldsl/instance/spec1.tdsl|(527,2,<27,76>,<27,78>),|file:///h:/Altri%20computer/Il%20mio%20laptop/dsl_project/final/embedded-systems/rascaldsl/instance/spec1.tdsl|(532,2,<27,81>,<27,83>),|file:///h:/Altri%20computer/Il%20mio%20laptop/dsl_project/final/embedded-systems/rascaldsl/instance/spec1.tdsl|(537,2,<27,86>,<27,88>),|file:///h:/Altri%20computer/Il%20mio%20laptop/dsl_project/final/embedded-systems/rascaldsl/instance/spec1.tdsl|(522,2,<27,71>,<27,73>)]
 
 
 class bb_bhv(Behavior):
@@ -25,7 +25,7 @@ class bb_bhv(Behavior):
 		if fire_cond != self.has_fired:
 			self.has_fired = fire_cond
 			if self.has_fired:
-				self.operations = [lambda: MOTOR.run(forward=True, distance=1, speed=30), lambda: S.beep()]
+				self.operations = [lambda: MOTOR.run(forward=True, distance=10, speed=30), lambda: S.beep()]
 				return True
 
 		return False
@@ -79,7 +79,7 @@ class bc_bhv(Behavior):
 		if fire_cond != self.has_fired:
 			self.has_fired = fire_cond
 			if self.has_fired:
-				self.operations = [lambda: MOTOR.run(forward=True, distance=1, speed=30), lambda: S.beep(), lambda: MOTOR.turn(direction="LEFT", degrees=90, speed=30)]
+				self.operations = [lambda: MOTOR.run(forward=True, distance=10, speed=30), lambda: S.beep(), lambda: MOTOR.turn(direction="RIGHT", degrees=90, speed=30)]
 				return True
 
 		return False
@@ -133,7 +133,7 @@ class bd_bhv(Behavior):
 		if fire_cond != self.has_fired:
 			self.has_fired = fire_cond
 			if self.has_fired:
-				self.operations = [lambda: MOTOR.run(forward=True, distance=1, speed=30), lambda: S.beep(), lambda: MOTOR.turn(direction="LEFT", degrees=90, speed=30), lambda: MOTOR.run(forward=True, distance=1, speed=30), lambda: ARM_MOTOR.move(up=False, rotations=1, block=True), lambda: time.sleep(36000), lambda: ARM_MOTOR.move(up=True, rotations=1, block=True), lambda: MOTOR.run(forward=True, distance=1, speed=30), lambda: S.beep(), lambda: MOTOR.turn(direction="LEFT", degrees=90, speed=30)]
+				self.operations = [lambda: MOTOR.run(forward=True, distance=10, speed=30), lambda: S.beep(), lambda: MOTOR.turn(direction="RIGHT", degrees=90, speed=30), lambda: MOTOR.run(forward=True, distance=10, speed=30), lambda: ARM_MOTOR.move(up=False, rotations=1, block=True), lambda: time.sleep(36000), lambda: ARM_MOTOR.move(up=True, rotations=1, block=True), lambda: MOTOR.run(forward=True, distance=10, speed=30), lambda: S.beep(), lambda: MOTOR.turn(direction="RIGHT", degrees=90, speed=30)]
 				return True
 
 		return False
@@ -187,7 +187,7 @@ class ba_bhv(Behavior):
 		if fire_cond != self.has_fired:
 			self.has_fired = fire_cond
 			if self.has_fired:
-				self.operations = [lambda: MOTOR.run(forward=True, distance=1, speed=30)]
+				self.operations = [lambda: MOTOR.run(forward=True, distance=10, speed=30)]
 				return True
 
 		return False
@@ -255,20 +255,18 @@ class ma_RunningBhv(Behavior):
 		Behavior.__init__(self)
 		self.counter_action = 0
 		RUNNING_ACTIONS_DONE = False
-		self.operations = [[lambda: ()], [lambda: MOTOR.run(forward=True, distance=1, speed=30), lambda: S.beep(), lambda: MOTOR.turn(direction="LEFT", degrees=30, speed=30), lambda: MOTOR.turn(direction="LEFT", degrees=30, speed=30), lambda: MOTOR.turn(direction="LEFT", degrees=30, speed=30)]]
-		self.log_operations = [[lambda: ()], [lambda: MOTOR.log_distance(1), lambda: (), lambda: MOTOR.log_angle(30), lambda: MOTOR.log_angle(30), lambda: MOTOR.log_angle(30)]]
+		self.operations = [[lambda: ()], [lambda: MOTOR.oddometry_start(), lambda: MOTOR.to_coordinates(0, 20, speed=30), lambda: MOTOR.to_coordinates(10, 20, speed=30), lambda: MOTOR.to_coordinates(10, 20, speed=30), lambda: MOTOR.to_coordinates(31, 41, speed=10), lambda: MOTOR.oddometry_stop()]]
 
 	def check(self):
 		return not TASK_REGISTRY.tasks_done() and not RUNNING_ACTIONS_DONE
 
 	def action(self):
 		
-		for operation, log_operation in zip(self.operations[EXECUTING_STATE][self.counter_action:], self.log_operations[EXECUTING_STATE][self.counter_action:]):
+		for operation in self.operations[EXECUTING_STATE][self.counter_action:]:
 			operation()
 			while self.motor.is_running and not self.supressed:
 				pass
 			if not self.supressed:
-				log_operation()
 				self.counter_action += 1
 		
 		if self.counter_action == len(self.operations[EXECUTING_STATE]):
@@ -323,19 +321,17 @@ class mb_RunningBhv(Behavior):
 		self.counter_action = 0
 		RUNNING_ACTIONS_DONE = False
 		self.operations = [[lambda: ()]]
-		self.log_operations = [[lambda: ()]]
 
 	def check(self):
 		return not TASK_REGISTRY.tasks_done() and not RUNNING_ACTIONS_DONE
 
 	def action(self):
 		
-		for operation, log_operation in zip(self.operations[EXECUTING_STATE][self.counter_action:], self.log_operations[EXECUTING_STATE][self.counter_action:]):
+		for operation in self.operations[EXECUTING_STATE][self.counter_action:]:
 			operation()
 			while self.motor.is_running and not self.supressed:
 				pass
 			if not self.supressed:
-				log_operation()
 				self.counter_action += 1
 		
 		if self.counter_action == len(self.operations[EXECUTING_STATE]):
@@ -391,19 +387,17 @@ class md_RunningBhv(Behavior):
 		self.counter_action = 0
 		RUNNING_ACTIONS_DONE = False
 		self.operations = [[lambda: ()], [lambda: ()]]
-		self.log_operations = [[lambda: ()], [lambda: ()]]
 
 	def check(self):
 		return not TASK_REGISTRY.tasks_done() and not RUNNING_ACTIONS_DONE
 
 	def action(self):
 		
-		for operation, log_operation in zip(self.operations[EXECUTING_STATE][self.counter_action:], self.log_operations[EXECUTING_STATE][self.counter_action:]):
+		for operation in self.operations[EXECUTING_STATE][self.counter_action:]:
 			operation()
 			while self.motor.is_running and not self.supressed:
 				pass
 			if not self.supressed:
-				log_operation()
 				self.counter_action += 1
 		
 		if self.counter_action == len(self.operations[EXECUTING_STATE]):

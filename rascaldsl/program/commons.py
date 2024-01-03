@@ -59,8 +59,8 @@ class Motor():
     def __init__(self, motor, base_speed=BASE_SPEED):
         self.motor = motor
         self.base_speed = base_speed
-        self.log_distance = 0
-        self.log_angle = 0
+        # self.log_distance = 0
+        # self.log_angle = 0
 
     def run(self, forward=True, distance=10, speed=None, speedM=None, block=False, brake=False):
         """Runs the motor for a certain distance (cm)"""
@@ -93,21 +93,32 @@ class Motor():
     def stop(self):
         self.motor.stop()
 
-    def log_reset(self):
-        self.log_distance = 0
-        self.log_angle = 0
+    def odometry_start(self):
+        self.motor.odometry_start()
     
-    def log_distance(self, distance):
-        self.log_distance += distance
+    def odometry_stop(self):
+        self.motor.odometry_stop()
     
-    def log_angle(self, angle):
-        self.log_angle += angle
+    def to_coordinates(self, x, y, speed=None, speedM=0.5, block=False, brake=False):
+        if speed is None:
+            speed = self.base_speed * speedM
+        self.motor.to_coordinates(x, y, SpeedPercent(speed), block=block, brake=brake)
+
+    # def log_reset(self):
+    #     self.log_distance = 0
+    #     self.log_angle = 0
     
-    def get_log_distance(self):
-        return self.log_distance
+    # def log_distance(self, distance):
+    #     self.log_distance += distance
     
-    def get_log_angle(self):
-        return self.log_angle
+    # def log_angle(self, angle):
+    #     self.log_angle += angle
+    
+    # def get_log_distance(self):
+    #     return self.log_distance
+    
+    # def get_log_angle(self):
+    #     return self.log_angle
 
     @property
     def is_running(self):

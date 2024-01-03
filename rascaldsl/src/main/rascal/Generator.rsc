@@ -7,6 +7,7 @@ import String;
 import Location;
 import Set;
 import Map;
+import util::Math;
 
 import Syntax;
 import Parser;
@@ -336,31 +337,21 @@ str printMissionRunningBhv(list[list[DefInfo]] action_task, list[int] action_sta
     int j = 0;
     for (int i <- [0 .. max_state_index]) {
         if (i in action_states_index) {
-            operations = [];
-            log_operations = [];
-            for (action <- action_task[j]) {
-                tmp_ret = generateActionTask(action);
-                operations += tmp_ret[0];
-                log_operations += tmp_ret[1];
-            }
-            operations_init += printListLambda(operations);
-            log_operations_init += printListLambda(log_operations);
+            operations_init += printListLambda(generateActionTask(action_task[j]));
             j += 1;
         }
         else {
             operations_init += ["[lambda: ()]"];
-            log_operations_init += ["[lambda: ()]"];
         }
     }
 
 
     action_update = "
-    'for operation, log_operation in zip(self.operations[EXECUTING_STATE][self.counter_action:], self.log_operations[EXECUTING_STATE][self.counter_action:]):
+    'for operation in self.operations[EXECUTING_STATE][self.counter_action:]:
     '\toperation()
     '\twhile self.motor.is_running and not self.supressed:
     '\t\tpass
     '\tif not self.supressed:
-    '\t\tlog_operation()
     '\t\tself.counter_action += 1
     '
     'if self.counter_action == len(self.operations[EXECUTING_STATE]):
@@ -377,7 +368,6 @@ str printMissionRunningBhv(list[list[DefInfo]] action_task, list[int] action_sta
     '\t\tself.counter_action = 0
     '\t\tRUNNING_ACTIONS_DONE = False
     '\t\tself.operations = [<intercalate(", ", operations_init)>]
-    '\t\tself.log_operations = [<intercalate(", ", log_operations_init)>]
     '
     '\tdef check(self):
     '\t\treturn not TASK_REGISTRY.tasks_done() and not RUNNING_ACTIONS_DONE
@@ -470,36 +460,106 @@ list[str] generateAction(DefInfo defInfo) {
     return ["()"];
 }
 
-tuple[list[str], list[str]] generateActionTask(DefInfo defInfo) {
+list[str] generateActionTask(list[DefInfo] actions_defInfo) {
     operations = [];
-    log_operations = [];
-    if (ma <- defInfo.moveAction) {
-        if (ma.direction == "stop") return <["MOTOR.stop()"], ["()"]>;
-        else {
-            base_distance = 30;
-            for (int i <- [0, base_distance .. ma.distance]) {
-                distance = min(base_distance, ma.distance - i);
-                if (ma.direction == "forward") operations += ["MOTOR.run(forward=True, distance=<distance>, speed=<ma.speed>)"];
-                if (ma.direction == "backward") operations += ["MOTOR.run(forward=False, distance=<distance>, speed=<ma.speed>)"];
-                log_operations += "MOTOR.log_distance(<distance>)";
+    int i = 0;
+    while (i < size(actions_defInfo)) {
+        if (ma_i <- actions_defInfo[i].moveAction || ta_i <- actions_defInfo[i].turnAction) {
+            if (ma <- actions_defInfo[i].moveAction && ma.direction == "stop") operations += ["MOTOR.stop()"];
+            else {
+                actions_to_compute = [];
+                for(int j <- [i .. size(actions_defInfo)]) {
+                    if (ma_j <- actions_defInfo[j].moveAction) {
+                        if (ma_j.direction == "stop") break;
+                        else actions_to_compute += actions_defInfo[j];
+                    }
+                    else if (ta_j <- actions_defInfo[j].turnAction) actions_to_compute += actions_defInfo[j];
+                    else break;
+                    i += 1;
+                }
+                operations += ["MOTOR.oddometry_start()"];
+                for (coordinates <- computeCoordinates(actions_to_compute)) {
+                    operations += ["MOTOR.to_coordinates(<coordinates[0]>, <coordinates[1]>, speed=<coordinates[2]>)"];
+                }
+                operations += ["MOTOR.oddometry_stop()"];
             }
-            return <operations, log_operations>;
+        }
+        else {
+            operations += generateAction(actions_defInfo[i]);
+            i += 1;
         }
     }
-    if (ta <- defInfo.turnAction) {
-        base_angle = 30;
-        for (int i <- [0, base_angle .. ta.angle]) {
-            angle = min(base_angle, ta.angle - i);
-            if (ta.direction == "left") operations += ["MOTOR.turn(direction=\"LEFT\", degrees=<angle>, speed=<ta.speed>)"];
-            if (ta.direction == "right") operations += ["MOTOR.turn(direction=\"RIGHT\", degrees=<angle>, speed=<ta.speed>)"];
-            if (ta.direction == "none") operations += ["MOTOR.turn(direction=\"None\", degrees=<angle>, speed=<ta.speed>)"];
-            log_operations += "MOTOR.log_angle(<angle>)";
-        }
-        return <operations, log_operations>;
-    }
-    operations += generateAction(defInfo);
-    return <operations, ["()" | i <- [0 .. size(operations)]]>;
+    return operations;
 }
+
+list[tuple[int, int, int]] computeCoordinates(list[DefInfo] actions) {
+    int angle = 90;
+    real x = 0.0;
+    real y = 0.0;
+    int speed = 0;
+    retVal = [];
+    curr_action = "";
+    if (ta <- actions[0].turnAction) last_action = "turn";
+    else last_action = "move";
+
+    for (action <- actions) {
+        if (ta <- action.turnAction) {
+            if (ta.direction == "left") angle = (angle + ta.angle) %360;
+            if (ta.direction == "right" || ta.direction == "none") angle = (angle - ta.angle) %360;
+            speed = ta.speed;
+            curr_action = "turn";
+        }
+        else if (ma <- action.moveAction) {
+            d = 0;
+            if (ma.direction == "forward") d += ma.distance;
+            if (ma.direction == "backward") d -= ma.distance;
+            x += d * cos(angle * PI()/180);
+            y += d * sin(angle * PI()/180);
+            curr_action = "move";
+            speed = ma.speed;
+        }
+
+        if (curr_action != last_action) {
+            retVal += [<toInt(x), toInt(y), speed>];
+            last_action = curr_action;
+        }
+
+    }
+    return retVal;
+}
+
+
+// tuple[list[str], list[str]] generateActionTask(DefInfo defInfo) {
+//     operations = [];
+//     log_operations = [];
+//     if (ma <- defInfo.moveAction) {
+//         if (ma.direction == "stop") return <["MOTOR.stop()"], ["()"]>;
+//         else {
+//             base_distance = 30;
+//             for (int i <- [0, base_distance .. ma.distance]) {
+//                 distance = min(base_distance, ma.distance - i);
+//                 if (ma.direction == "forward") operations += ["MOTOR.run(forward=True, distance=<distance>, speed=<ma.speed>)"];
+//                 if (ma.direction == "backward") operations += ["MOTOR.run(forward=False, distance=<distance>, speed=<ma.speed>)"];
+//                 log_operations += "MOTOR.log_distance(<distance>)";
+//             }
+//             return <operations, log_operations>;
+//         }
+//     }
+//     if (ta <- defInfo.turnAction) {
+//         base_angle = 30;
+//         for (int i <- [0, base_angle .. ta.angle]) {
+//             angle = min(base_angle, ta.angle - i);
+//             if (ta.direction == "left") operations += ["MOTOR.turn(direction=\"LEFT\", degrees=<angle>, speed=<ta.speed>)"];
+//             if (ta.direction == "right") operations += ["MOTOR.turn(direction=\"RIGHT\", degrees=<angle>, speed=<ta.speed>)"];
+//             if (ta.direction == "none") operations += ["MOTOR.turn(direction=\"None\", degrees=<angle>, speed=<ta.speed>)"];
+//             log_operations += "MOTOR.log_angle(<angle>)";
+//         }
+//         return <operations, log_operations>;
+//     }
+//     operations += generateAction(defInfo);
+//     return <operations, ["()" | i <- [0 .. size(operations)]]>;
+// }
+
 
 list[str] generateFromDefInfo(list[DefInfo] defInfoList, list[str](DefInfo) generator_method) {
     retVal = [];
