@@ -1,5 +1,7 @@
 module Generator
 
+import Static_Generator;
+
 import IO;
 import Set;
 import List;
@@ -16,7 +18,7 @@ import Checker;
 void main() {
     inFile = |project://rascaldsl/instance/spec1.tdsl|;
     cst = parsePlanning(inFile);
-    static_code = 
+    static_code = Static_code_generator();
     rVal = generator(cst, static_code[0], static_code[1]);
     println(rVal);
 }
@@ -33,7 +35,7 @@ DefInfo findReferenceFromSrc(TModel tm, src) {
     throw "Fix references in language instance";
 }
 
-str generator(cst) { // WIP
+str generator(cst, static_code, master_bhvs) { // WIP
     tm = modulesTModelFromTree(cst);
     retVal = "";
     trigger_list = [];
@@ -58,7 +60,7 @@ str generator(cst) { // WIP
         '<generateMissionsDef(missions, tm, trigger_map, action_map)>
         '
         '
-        '<printMissionsUsage(missions, tm)>
+        '<printMissionsUsage(missions, tm, master_bhvs)>
         '";
 
     }
@@ -417,7 +419,7 @@ str printMissionRunningBhv(list[list[DefInfo]] action_task, list[int] action_sta
 }
 
 
-str printMissionsUsage(missions, tm) {
+str printMissionsUsage(missions, tm, master_bhvs) {
     retVal = [];
     for (<mission> <- [<id> |/(ID) `<ID id>` := missions]) {
         DefInfo defInfo = findReference(tm, mission);
@@ -439,7 +441,7 @@ str printMissionsUsage(missions, tm) {
                 feedback_end_operations += generateActionFeedback(feedback_operation);
             }
 
-
+            retVal += master_bhvs;
             for (behavior <- miss.behaviorList) {
                 retVal += "CONTROLLER.add(<getContent(behavior)>_bhv())";
             }
