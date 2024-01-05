@@ -1,7 +1,7 @@
 ta == COLOR mid black
 tb == COLOR left black
 
-tc == INDISTANCE front 10
+tc == INDISTANCE back 10
 te == TOUCH left
 
 td == ta + tc + tb
@@ -14,19 +14,20 @@ aaa := FORWARD 30 10
 ac := BEEP
 af := MEASURE 10h
 acc := SPEAK "Hello World"
+accc := acc^30
 acd := LED green
 
 ad := aa + ac + ab
 
-Behavior: ba WHEN ta DO aa
+Behavior: ba WHEN ta DO aa^3
 Behavior: bb WHEN ALL [te, td] DO [aa, ac]
 Behavior: bc WHEN ANY [ta, tb, tc] DO ad
 Behavior: bd WHEN [ta, td] DO [ad, aa, af, ad]
 
 
 
-Mission: ma EXECUTE [{ANY [td, te]}, [aa, aa, ab, aa, abb, aaa]] WHILE ba + bb + bc + bd 
-Mission: mb EXECUTE {ta} WHILE [ba, bb] FEEDBACKS: {START[acc, ac], END [ac, ac, acd], TIMEOUT [ac, ac]} 
+Mission: ma EXECUTE [{ANY [td, te] 30s}, [aa, aa, ab, aa, abb, aaa]] WHILE ba + bb + bc + bd 
+Mission: mb EXECUTE accc WHILE [ba, bb] FEEDBACKS: {START[acc, ac], END [ac, ac, acd], TIMEOUT [ac, ac]} 
 Mission: mc EXECUTE [{[ta, tb]}, {tc}] WHILE ba
 Mission: md EXECUTE [{ta}, {tb}] WHILE [ba, bb, bd, bc]
 Mission: mf EXECUTE {ta} WHILE ba FEEDBACKS: {START[ac], END, TIMEOUT [ac]}  

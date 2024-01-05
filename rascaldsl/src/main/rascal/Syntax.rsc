@@ -26,24 +26,20 @@ syntax MissionFeedback = "FEEDBACKS:" "{""START" IDList? startFeedback "," "END"
 
 
 syntax Task 
-    = triggerListTask: '{' ListMod? listMod IDList triggerIdList '}'
-    | triggerId: '{' ID idTrigger '}'
-    | actionListTask: IDList actionIdList
-    | actionTask: ID idAction
+    = triggerListTask: '{' ListMod? listMod IDList triggerIdList Time? timeout '}'
+    | triggerId: '{' ID idTrigger Time? timeout'}'
+    | actionListTask: IDList actionIdList Time? timeout
+    | actionTask: ID idAction Time? timeout
 ;
 
 
 syntax Action
     = new: ID idNew ActionAssignment assignment RoverAction roverAction
-    // | newList: ID idNew ActionAssignment assignment '[' {RoverAction ','}+ ']' //not implemented
-    // | copy: ID idNew ActionAssignment assignment ID idOld   // not implemented
     | copyList: ID idNew ActionAssignment assignment IDList idList
 ;
 
 syntax Trigger
     = new: ID idNew TriggerAssignment assignment RoverTrigger roverTrigger
-    // | newList: ID idNew TriggerAssignment assignment '[' {RoverTrigger ','}+ ']' // not implemented
-    // | copy: ID idNew TriggerAssignment assignment ID idOld    // not implemented
     | copyList: ID idNew TriggerAssignment assignment IDList idList 
 ;
 
@@ -68,7 +64,6 @@ syntax TurnAction
     | turnRandom: "RANDOM" ANGLE angle Speed? speed
 ;
 
-syntax Speed = PERCENTAGE speed;
 
 syntax SpeakAction
     = speak: "SPEAK" STR text
@@ -101,10 +96,15 @@ syntax ActionAssignment = actionAssignment: ':=';
 syntax TriggerAssignment = triggerAssignment: '==';
 
 syntax IDList
-    = explicit: '[' {ID ','}+ ']'
-    | implicit: ID id '+' {ID '+'}+
+    = explicit: '[' {IDListComponent ','}+ ']'
+    | implicit: IDListComponent idComponent '+' {IDListComponent '+'}+
+    | pow: ID '^' NATURAL power
 ;
 
+syntax IDListComponent
+    = id: ID id
+    | powId: ID '^' NATURAL power
+;
 
 
 syntax ListMod
@@ -123,6 +123,8 @@ syntax DistanceUnit = "cm" | "m" | "mm" | "dm";
 syntax Distance = NATURAL distance DistanceUnit? distanceUnit;
 syntax Time = NATURAL time TimeUnit? timeUnit;
 syntax TimeUnit = "s" | "min" | "h";
+syntax Speed = PERCENTAGE speed;
+
 
 lexical INT = ([\-0-9][0-9]* !>> [0-9]);
 lexical NATURAL = ([0-9][0-9]* !>> [0-9]);

@@ -53,7 +53,7 @@ data LedAction = ledAction(str color = "");
 data MeasureAction = measureAction(int time=1);
 
 data Behavior = behavior(list[loc] triggerList = [], list[loc] actionList = [], str triggerListMod="ALL");
-data Task = task(list[loc] activityList = [], str activityType="TRIGGER", str activityListMod="ALL");
+data Task = task(list[loc] activityList = [], str activityType="TRIGGER", str activityListMod="ALL", int timeout=60);
 data Mission = mission(list[Task] taskList = [], list[loc] behaviorList = [], tuple[list[loc], list[loc], list[loc]] feedbacks = <[], [], []>);
 
 // ADT constructors
@@ -111,9 +111,24 @@ void checkIdList(Solver s, idCheckList, list[AType] validTypes, list[str] exclud
 
 list[loc] collectIdList(Collector c, idCollectList, role) {
      result = [];
-     for (<id> <- [<id> |/(ID) `<ID id>` := idCollectList]) {
-          result +=  id.src;
+     if(/(IDList) `<ID id> ^ <NATURAL power>` := idCollectList) {
+          pow = toInt("<power>");
+          if (pow == 0) c.report(error(power, "power should be greater than 0"));
           c.use(id, {role});
+          for (i <- [0..pow]) result += id.src;
+     }
+     else for (<idC> <- [<idComponent> |/(IDListComponent) `<IDListComponent idComponent>` := idCollectList]) {
+          if(/(IDListComponent) `<ID id>` := idC) {
+               c.use(id, {role});
+               result += id.src;
+          }
+          else if(/(IDListComponent) `<ID id> ^ <NATURAL power>` := idC) {
+               c.use(id, {role});
+               pow = toInt("<power>");
+               if (pow == 0) c.report(error(power, "power should be greater than 0"));
+               for (i <- [0..pow]) result += id.src;
+          }
+
      }
      return result;
 }
@@ -201,6 +216,7 @@ void collect(current: (Trigger) `<ID idNew> <TriggerAssignment triggerAssignment
           c.define("<idNew>", triggerId(), idNew, dt);
      }
      else if(/(DistanceTrigger)`INDISTANCE <DistanceSensor distanceSensor> <Distance distance>` := roverTrigger) {
+          if ("<distanceSensor>" == "back") c.report(info(current, "back sensor as a solo trigger for a Bhv is useless, since that behavior will always be preempted by a safety bhv"));
           dt = defType(distanceTriggerType());
           dt.distanceTrigger = [distanceTrigger(sensor="<distanceSensor>", distance=computeDistance(distance))];
           c.define("<idNew>", triggerId(), idNew, dt);
@@ -448,31 +464,38 @@ void collect(current: (Behavior)`Behavior: <ID idNew> WHEN <ListMod? listMod> <I
 
 // task
 Task collectTask(Collector c, task_in) {
-     if(/(Task) `<ID idAction>` := task_in) {
-          c.use(idAction, {actionId()});
-          return task(activityList=[idAction.src], activityListMod="ALL", activityType="ACTION");
-     } 
-     if (/(Task) `{<ID idTrigger>}` := task_in) {
-          c.use(idTrigger, {triggerId()});
-          return task(activityList=[idTrigger.src], activityListMod="ALL", activityType="TRIGGER");
-     }
-     if (/(Task) `<IDList actionIdList>` := task_in) {
-          actionList = collectIdList(c, actionIdList, actionId());
-          collect(actionIdList, c);
-          return task(activityList=actionList, activityListMod="ALL", activityType="ACTION");
-     }
-     if (/(Task) `{<IDList triggerIdList>}` := task_in) {
-          triggerList = collectIdList(c, triggerIdList, triggerId());
-          collect(triggerIdList, c);
-          return task(activityList=triggerList, activityListMod="ALL", activityType="TRIGGER");
-     }
-     if (/(Task) `{<ListMod listMod> <IDList triggerIdList>}` := task_in) {
-          triggerList = collectIdList(c, triggerIdList, triggerId());
-          collect(triggerIdList, c);
-          return task(activityList=triggerList, activityListMod="<listMod>", activityType="TRIGGER");
+     int timeout_value = 60;
+     if(/(Time) `<Time timeout>` := task_in) {
+          timeout_value = computeTime(timeout);
+          if (timeout_value <= 0) c.report(error(timeout, "timeout should be greater than 0"));
+          else if (timeout_value < 30) c.report(warning(timeout, "timeout less than 30s may be too short"));
      }
 
-     return task(activityList=[], activityListMod="ALL", activityType="ACTION");
+     if(/(Task) `<ID idAction> <Time? _>` := task_in) {
+          c.use(idAction, {actionId()});
+          return task(activityList=[idAction.src], activityListMod="ALL", activityType="ACTION", timeout=timeout_value);
+     } 
+     if (/(Task) `{<ID idTrigger> <Time? _>}` := task_in) {
+          c.use(idTrigger, {triggerId()});
+          return task(activityList=[idTrigger.src], activityListMod="ALL", activityType="TRIGGER", timeout=timeout_value);
+     }
+     if (/(Task) `<IDList actionIdList> <Time? _>` := task_in) {
+          actionList = collectIdList(c, actionIdList, actionId());
+          collect(actionIdList, c);
+          return task(activityList=actionList, activityListMod="ALL", activityType="ACTION", timeout=timeout_value);
+     }
+     if (/(Task) `{<IDList triggerIdList> <Time? _>}` := task_in) {
+          triggerList = collectIdList(c, triggerIdList, triggerId());
+          collect(triggerIdList, c);
+          return task(activityList=triggerList, activityListMod="ALL", activityType="TRIGGER", timeout=timeout_value);
+     }
+     if (/(Task) `{<ListMod listMod> <IDList triggerIdList> <Time? _>}` := task_in) {
+          triggerList = collectIdList(c, triggerIdList, triggerId());
+          collect(triggerIdList, c);
+          return task(activityList=triggerList, activityListMod="<listMod>", activityType="TRIGGER", timeout=timeout_value);
+     }
+
+     return task(activityList=[], activityListMod="ALL", activityType="ACTION", timeout=timeout_value);
 }
 
 // mission
@@ -495,9 +518,6 @@ void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <Task task> WHILE <I
      behaviorList = collectIdList(c, idBhvs, behaviorId());
      collect(idBhvs, c);
 
-     feedbacks = <[], [], []>;
-     if (current has missionFeedback) feedbacks = collectFeedbacks(c, missionFeedback);
-
      dt = defType(missionType());
      dt.mission = [mission(taskList=[task_res], behaviorList=behaviorList, feedbacks=collectFeedbacks(c, missionFeedback))];
      c.define("<idNew>", missionId(), idNew, dt);
@@ -511,9 +531,6 @@ void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <TaskList tasks> WHI
      for (task_in <- [task_in |/(Task) `<Task task_in>` := tasks]) {
           taskList_res += collectTask(c, task_in);
      } 
-
-     feedbacks = <[], [], []>;
-     // if (current has missionFeedback) feedbacks = collectFeedbacks(c, missionFeedback);
 
      dt = defType(missionType());
      dt.mission = [mission(taskList=taskList_res, behaviorList=[idBhv.src], feedbacks=collectFeedbacks(c, missionFeedback))];
@@ -529,9 +546,6 @@ void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <TaskList tasks> WHI
      for (task_in <- [task_in |/(Task) `<Task task_in>` := tasks]) {
           taskList_res += collectTask(c, task_in);
      }
-
-     feedbacks = <[], [], []>;
-     // if (current has missionFeedback) feedbacks = collectFeedbacks(c, missionFeedback);
 
      dt = defType(missionType());
      dt.mission = [mission(taskList=taskList_res, behaviorList=behaviorList, feedbacks=collectFeedbacks(c, missionFeedback))];

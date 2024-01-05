@@ -16,7 +16,8 @@ import Checker;
 void main() {
     inFile = |project://rascaldsl/instance/spec1.tdsl|;
     cst = parsePlanning(inFile);
-    rVal = generator(cst);
+    static_code = 
+    rVal = generator(cst, static_code[0], static_code[1]);
     println(rVal);
 }
 
@@ -228,6 +229,12 @@ str generateMissionsDef(missions, tm, trigger_map, action_map) {
         DefInfo defInfo = findReference(tm, mission);
         if (miss <- defInfo.mission) {
             task_list = [];
+            list[str] feedback_timeout_operations = [];
+
+            for (feedback_operation_src <- miss.feedbacks[2]) {
+                DefInfo feedback_operation = findReferenceFromSrc(tm, feedback_operation_src);
+                feedback_timeout_operations += generateActionFeedback(feedback_operation);
+            }
             for (task <- miss.taskList) {
                 task_items = [];
                 if (task.activityType == "TRIGGER") {
@@ -245,21 +252,22 @@ str generateMissionsDef(missions, tm, trigger_map, action_map) {
                         task_items += tmp_ret[0];
                     }
                 }
-                task_list += <task_items, task.activityType, task.activityListMod>;
+                task_list += <task_items, task.activityType, task.activityListMod, task.timeout>;
 
             }
-            retVal += "<printMissionTaskBhv(task_list, "<mission>")>";
+            retVal += "<printMissionTaskBhv(task_list, "<mission>", feedback_timeout_operations)>";
             retVal += "<miss>";
         }
     }
     return intercalate("\n\n", retVal);
 }
 
-str printMissionTaskBhv(list[tuple[list[value], str, str]] task_list, mission_name) {
+str printMissionTaskBhv(list[tuple[list[value], str, str, int]] task_list, mission_name, list[str] timeout_operations) {
     
     list[str] states_init_reg = [];
     list[str] states_init_conds = [];
     list[int] action_states_index = [];
+    list[int] states_timeout = [];
     list[list[DefInfo]] action_task_list = [];
     int state_cont = 0;
 
@@ -268,23 +276,30 @@ str printMissionTaskBhv(list[tuple[list[value], str, str]] task_list, mission_na
         list[value] task_items = task[0];
         task_type = task[1];
         task_list_mod = task[2];
+        int task_timeout = task[3];
 
         if (task_type == "TRIGGER") {
             if (task_list_mod == "ANY" || task_list_mod == "SIM") {
                 states_init_conds += "[lambda: <printTriggers(task_items, task_list_mod)>]";
                 states_init_reg += "TASK_REGISTRY.add(\"state_<state_cont>\", 1)";
+                states_timeout += task_timeout;
                 state_cont += 1;
             }
             else if (task_list_mod == "ALL") {
                 states_init_conds += "<printListLambda(task_items)>";
                 states_init_reg += "TASK_REGISTRY.add(\"state_<state_cont>\", <size(task_items)>)";
+                states_timeout += task_timeout;
                 state_cont += 1;
             }
             else {
+                prev_state_cont = state_cont;
                 for (trigger <- task_items) {
                     states_init_conds += "[lambda: <trigger>]";
                     states_init_reg += "TASK_REGISTRY.add(\"state_<state_cont>\", 1)";
                     state_cont += 1;
+                }
+                for (int i <- [prev_state_cont .. state_cont]) {
+                    states_timeout += toInt(task_timeout / (state_cont - prev_state_cont));
                 }
             }
         }
@@ -293,16 +308,19 @@ str printMissionTaskBhv(list[tuple[list[value], str, str]] task_list, mission_na
             states_init_conds += "[lambda: RUNNING_ACTIONS_DONE]";
             action_task_list += [task_items];
             action_states_index += state_cont;
+            states_timeout += task_timeout;
             state_cont += 1;
         }
     }
 
-    list[str] states_init = states_init_reg + "self.task_list_cond = [<intercalate(", ", states_init_conds)>]";
+    list[str] states_init = states_init_reg + "self.task_list_cond = [<intercalate(", ", states_init_conds)>]" + "self.timeout = [<intercalate(", ", states_timeout)>]";
     states_check = "for i in range(len(self.task_list_cond[EXECUTING_STATE])):
     '\tTASK_REGISTRY.update(\"state_\" + str(EXECUTING_STATE), self.task_list_cond[EXECUTING_STATE][i](), i)
-    'if TASK_REGISTRY.task_done(\"state_\" + str(EXECUTING_STATE)):
+    'timeouted = self.timer != 0 and time.time() - self.timer \> self.timeout[EXECUTING_STATE]
+    'if TASK_REGISTRY.task_done(\"state_\" + str(EXECUTING_STATE)) or timeouted:
     '\tEXECUTING_STATE += 1
     '\tRUNNING_ACTIONS_DONE = False
+    '\tself.timer = 0
     '";
 
     retVal = "
@@ -312,19 +330,26 @@ str printMissionTaskBhv(list[tuple[list[value], str, str]] task_list, mission_na
     '\t\tglobal EXECUTING_STATE
     '\t\tEXECUTING_STATE = 0
     '\t\tself.fired = False
+    '\t\tself.timer = 0
     '\t\t<intercalate("\n", states_init)>
     '
     '\tdef check(self):
     '\t\tglobal EXECUTING_STATE, RUNNING_ACTIONS_DONE
     '\t\tif not self.fired:
+    '\t\t\tif self.timer == 0:
+    '\t\t\t\tself.timer = time.time()
     '\t\t\t<states_check>
-    '\t\t\tif EXECUTING_STATE == <state_cont>:
-    '\t\t\t\tself.fired = True
-    '\t\t\t\treturn True
+    '\t\t\t\tif EXECUTING_STATE == <state_cont>:
+    '\t\t\t\t\tself.fired = True
+    '\t\t\treturn timeouted
     '\t\treturn False
     '
     '\tdef action(self):
-    '\t\treturn True
+    '\t\tMOTOR.stop()
+    '\t\tif DEBUG:
+    '\t\t\ttimedlog(\"<mission_name> timeouted, at state\" + str(EXECUTING_STATE))
+    '\t\tfor operation in <timeout_operations>:
+    '\t\t\toperation()
     '
     '\tdef suppress(self):
     '\t\tpass
@@ -406,13 +431,11 @@ str printMissionsUsage(missions, tm) {
             list[str] feedback_end_operations = [];
             for (feedback_operation_src <- miss.feedbacks[0]) {
                 DefInfo feedback_operation = findReferenceFromSrc(tm, feedback_operation_src);
-                // feedback_start_operations += "<feedback_operation>";
                 feedback_start_operations += generateActionFeedback(feedback_operation);
 
             }
             for (feedback_operation_src <- miss.feedbacks[1]) {
                 DefInfo feedback_operation = findReferenceFromSrc(tm, feedback_operation_src);
-                // feedback_end_operations += "<feedback_operation>";
                 feedback_end_operations += generateActionFeedback(feedback_operation);
             }
 
@@ -478,7 +501,7 @@ list[str] generateAction(DefInfo defInfo) {
     }
     if (sa <- defInfo.speakAction) {
         if (sa.text == "&.&.&.") return ["S.beep()"];
-        return ["S.speak(\"<sa.text>\", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE)"];
+        return ["S.speak(<sa.text>, play_type=S.PLAY_NO_WAIT_FOR_COMPLETE)"];
     }
     if (la <- defInfo.ledAction) {
         return ["set_led(LEDS, \"<toUpperCase(la.color)>\")"];
@@ -569,39 +592,6 @@ list[tuple[int, int, int]] computeCoordinates(list[DefInfo] actions) {
     }
     return retVal;
 }
-
-
-// tuple[list[str], list[str]] generateActionTask(DefInfo defInfo) {
-//     operations = [];
-//     log_operations = [];
-//     if (ma <- defInfo.moveAction) {
-//         if (ma.direction == "stop") return <["MOTOR.stop()"], ["()"]>;
-//         else {
-//             base_distance = 30;
-//             for (int i <- [0, base_distance .. ma.distance]) {
-//                 distance = min(base_distance, ma.distance - i);
-//                 if (ma.direction == "forward") operations += ["MOTOR.run(forward=True, distance=<distance>, speed=<ma.speed>)"];
-//                 if (ma.direction == "backward") operations += ["MOTOR.run(forward=False, distance=<distance>, speed=<ma.speed>)"];
-//                 log_operations += "MOTOR.log_distance(<distance>)";
-//             }
-//             return <operations, log_operations>;
-//         }
-//     }
-//     if (ta <- defInfo.turnAction) {
-//         base_angle = 30;
-//         for (int i <- [0, base_angle .. ta.angle]) {
-//             angle = min(base_angle, ta.angle - i);
-//             if (ta.direction == "left") operations += ["MOTOR.turn(direction=\"LEFT\", degrees=<angle>, speed=<ta.speed>)"];
-//             if (ta.direction == "right") operations += ["MOTOR.turn(direction=\"RIGHT\", degrees=<angle>, speed=<ta.speed>)"];
-//             if (ta.direction == "none") operations += ["MOTOR.turn(direction=\"None\", degrees=<angle>, speed=<ta.speed>)"];
-//             log_operations += "MOTOR.log_angle(<angle>)";
-//         }
-//         return <operations, log_operations>;
-//     }
-//     operations += generateAction(defInfo);
-//     return <operations, ["()" | i <- [0 .. size(operations)]]>;
-// }
-
 
 list[str] generateFromDefInfo(list[DefInfo] defInfoList, list[str](DefInfo) generator_method) {
     retVal = [];
