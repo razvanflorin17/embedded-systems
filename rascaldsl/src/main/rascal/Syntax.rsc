@@ -14,11 +14,22 @@ syntax RoverConfig  //W.I.P.
     = new: "Rover:" IDList missions "MAC:" STR macAddress 
 ;
 
-syntax Mission = "Mission:" ID id "EXECUTE" (Task | TaskList) tasks "WHILE" (ID | IDList) behaviors;
+syntax Mission = "Mission:" ID id "EXECUTE" (Task | TaskList) tasks "WHILE" (ID | IDList) behaviors MissionFeedback? missionFeedback;
 
 syntax Behavior
     = newSingleTrigger: "Behavior:" ID id "WHEN" ID trigger "DO" (ID | IDList) action
     | newMultiTrigger: "Behavior:" ID id "WHEN" ListMod? listMod IDList triggerList "DO" (ID | IDList) action
+;
+
+
+syntax MissionFeedback = "FEEDBACKS:" "{""START" IDList? startFeedback "," "END" IDList? endFeedback "," "TIMEOUT" IDList? timeoutFeedback "}";
+
+
+syntax Task 
+    = triggerListTask: '{' ListMod? listMod IDList triggerIdList '}'
+    | triggerId: '{' ID idTrigger '}'
+    | actionListTask: IDList actionIdList
+    | actionTask: ID idAction
 ;
 
 
@@ -68,7 +79,6 @@ syntax LedAction = "LED" ColorWritable color;
 syntax ColorWritable
     = "red" | "green" | "blue" | "black" | "yellow" | "amber" | "orange";
 
-
 syntax MeasureAction = "MEASURE" Time? time;
 
 syntax RoverTrigger
@@ -104,13 +114,6 @@ syntax ListMod
     | "SIM" // stand for "SIMULTANEOUS"
 ;
 
-syntax Task 
-    = triggerListTask: '{' ListMod? listMod IDList triggerIdList '}'
-    | triggerId: '{' ID idTrigger '}'
-    | actionListTask: IDList actionIdList
-    | actionTask: ID idAction
-;
-
 syntax TaskList 
     = explicit: '[' {Task ','}+ ']'
     | implicit: Task task '+' {Task '+'}+
@@ -129,4 +132,4 @@ lexical ID = ([a-z/.\-][a-zA-Z0-9_/.]* !>> [a-zA-Z0-9_/.]) \ Reserved;
 lexical STR = "\"" ![\"\n]* "\"";
 
 keyword Reserved = "Mission:" | "Behavior:" | "WHEN" | "WHILE" | "DO" |"green" | "red" | "blue" | "black" | "yellow" | "amber" | "orange" | "°" | "%" | "m" | "dm" | "cm" | "mm"
-        | "FORWARD" | "BACKWARD" | "TURN" | "SPEAK" | "LED"| "BEEP" | "MEASURE" | "ANY" | "ALL" | "ALLORD" | ":" | "left" | "right" | "LEFT" | "RIGHT" | "mid" | "back" | "front" | "EXECUTE" | "PERFORM" | "MAC:";
+        | "FORWARD" | "BACKWARD" | "TURN" | "SPEAK" | "LED"| "BEEP" | "MEASURE" | "ANY" | "ALL" | "ALLORD" | "FEEDBACKS:" | "START" | "END" | "TIMEOUT" | ":" | "left" | "right" | "LEFT" | "RIGHT" | "mid" | "back" | "front" | "EXECUTE" | "PERFORM" | "MAC:";

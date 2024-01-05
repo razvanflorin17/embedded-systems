@@ -13,9 +13,10 @@ abb := LEFT 45° 30
 aaa := FORWARD 30 10
 ac := BEEP
 af := MEASURE 10h
+acc := SPEAK "Hello World"
+acd := LED green
 
 ad := aa + ac + ab
-
 
 Behavior: ba WHEN ta DO aa
 Behavior: bb WHEN ALL [te, td] DO [aa, ac]
@@ -24,10 +25,10 @@ Behavior: bd WHEN [ta, td] DO [ad, aa, af, ad]
 
 
 
-Mission: ma EXECUTE [{ANY [td, te]}, [aa, aa, ab, aa, abb, aaa]] WHILE ba + bb + bc + bd
-Mission: mb EXECUTE {ta} WHILE [ba, bb]
+Mission: ma EXECUTE [{ANY [td, te]}, [aa, aa, ab, aa, abb, aaa]] WHILE ba + bb + bc + bd 
+Mission: mb EXECUTE {ta} WHILE [ba, bb] FEEDBACKS: {START[acc, ac], END [ac, ac, acd], TIMEOUT [ac, ac]} 
 Mission: mc EXECUTE [{[ta, tb]}, {tc}] WHILE ba
 Mission: md EXECUTE [{ta}, {tb}] WHILE [ba, bb, bd, bc]
+Mission: mf EXECUTE {ta} WHILE ba FEEDBACKS: {START[ac], END, TIMEOUT [ac]}  
 
-
-Rover: [ma, mb, ma, mb, md] MAC: "211"
+Rover: [ma, mb, ma, mb, md, mf] MAC: "211"

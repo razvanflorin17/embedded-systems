@@ -249,6 +249,7 @@ str generateMissionsDef(missions, tm, trigger_map, action_map) {
 
             }
             retVal += "<printMissionTaskBhv(task_list, "<mission>")>";
+            retVal += "<miss>";
         }
     }
     return intercalate("\n\n", retVal);
@@ -308,11 +309,13 @@ str printMissionTaskBhv(list[tuple[list[value], str, str]] task_list, mission_na
     'class <mission_name>_updateTasksBhv(Behavior):
     '\tdef __init__(self):
     '\t\tBehavior.__init__(self)
+    '\t\tglobal EXECUTING_STATE
     '\t\tEXECUTING_STATE = 0
     '\t\tself.fired = False
     '\t\t<intercalate("\n", states_init)>
     '
     '\tdef check(self):
+    '\t\tglobal EXECUTING_STATE, RUNNING_ACTIONS_DONE
     '\t\tif not self.fired:
     '\t\t\t<states_check>
     '\t\t\tif EXECUTING_STATE == <state_cont>:
@@ -341,7 +344,7 @@ str printMissionRunningBhv(list[list[DefInfo]] action_task, list[int] action_sta
             j += 1;
         }
         else {
-            operations_init += ["[lambda: ()]"];
+            operations_init += printListLambda(["MOTOR.run(forward=True, distance=100, brake=False, speedM=1.3)", "(self.counter_action := 0)"]);
         }
     }
 
@@ -365,11 +368,13 @@ str printMissionRunningBhv(list[list[DefInfo]] action_task, list[int] action_sta
     'class <mission_name>_RunningBhv(Behavior):
     '\tdef __init__(self):
     '\t\tBehavior.__init__(self)
+    '\t\tglobal RUNNING_ACTIONS_DONE
     '\t\tself.counter_action = 0
     '\t\tRUNNING_ACTIONS_DONE = False
     '\t\tself.operations = [<intercalate(", ", operations_init)>]
     '
     '\tdef check(self):
+    '\t\tglobal RUNNING_ACTIONS_DONE
     '\t\treturn not TASK_REGISTRY.tasks_done() and not RUNNING_ACTIONS_DONE
     '
     '\tdef action(self):
@@ -397,14 +402,38 @@ str printMissionsUsage(missions, tm) {
             'CONTROLLER.add(<mission>_updateTasksBhv())
             '";
 
+            list[str] feedback_start_operations = [];
+            list[str] feedback_end_operations = [];
+            for (feedback_operation_src <- miss.feedbacks[0]) {
+                DefInfo feedback_operation = findReferenceFromSrc(tm, feedback_operation_src);
+                // feedback_start_operations += "<feedback_operation>";
+                feedback_start_operations += generateActionFeedback(feedback_operation);
+
+            }
+            for (feedback_operation_src <- miss.feedbacks[1]) {
+                DefInfo feedback_operation = findReferenceFromSrc(tm, feedback_operation_src);
+                // feedback_end_operations += "<feedback_operation>";
+                feedback_end_operations += generateActionFeedback(feedback_operation);
+            }
+
+
             for (behavior <- miss.behaviorList) {
                 retVal += "CONTROLLER.add(<getContent(behavior)>_bhv())";
             }
             retVal += "bluetooth_connection.start_listening(lambda data: ())
-            's.speak(\'Start\')
+            's.speak(\'Start\') # REMOVE BEFORE DELIVERY
+            '
+            'for operation in <printListLambda(feedback_start_operations)>:
+            '\toperation()
+            '
             'if DEBUG:
             '\ttimedlog(\"Starting\")
-            'CONTROLLER.run()\n\n\n\n
+            'CONTROLLER.run()
+            '
+            '
+            'for operation in <printListLambda(feedback_end_operations)>:
+            '\toperation()
+            '\n\n\n
             '";
         }
 
@@ -449,7 +478,7 @@ list[str] generateAction(DefInfo defInfo) {
     }
     if (sa <- defInfo.speakAction) {
         if (sa.text == "&.&.&.") return ["S.beep()"];
-        return ["S.speak(\"<sa.text>\")"];
+        return ["S.speak(\"<sa.text>\", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE)"];
     }
     if (la <- defInfo.ledAction) {
         return ["set_led(LEDS, \"<toUpperCase(la.color)>\")"];
@@ -459,6 +488,18 @@ list[str] generateAction(DefInfo defInfo) {
     }
     return ["()"];
 }
+
+list[str] generateActionFeedback(DefInfo action_defInfo) {
+    if (sa <- action_defInfo.speakAction) {
+        if (sa.text == "&.&.&.") return ["S.beep()"];
+        return ["S.speak(<sa.text>, play_type=S.PLAY_WAIT_FOR_COMPLETE)"];
+    }
+    if (la <- action_defInfo.ledAction) {
+        return ["feedback_leds_blocking(LEDS, \"<toUpperCase(la.color)>\")"];
+    }
+    return ["()"];
+}
+
 
 list[str] generateActionTask(list[DefInfo] actions_defInfo) {
     operations = [];
@@ -491,6 +532,7 @@ list[str] generateActionTask(list[DefInfo] actions_defInfo) {
     }
     return operations;
 }
+
 
 list[tuple[int, int, int]] computeCoordinates(list[DefInfo] actions) {
     int angle = 90;

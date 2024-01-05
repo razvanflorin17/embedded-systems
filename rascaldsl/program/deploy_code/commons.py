@@ -25,10 +25,14 @@ def set_leds_color(leds, color):
     leds.set_color("LEFT", color) 
     leds.set_color("RIGHT", color)
 
-def feedback_leds_blocking(leds, color): # for generated code
-    set_leds_color(leds, color)
+
+def feedback_text_blocking(text): # for generated code
+    S.speak(text, S.PLAY_WAIT_FOR_COMPLETE)
+
+def feedback_leds_blocking(color): # for generated code
+    set_leds_color(L, color)
     time.sleep(0.5)
-    leds.reset()
+    L.reset()
 
 
 class ArmMotor():

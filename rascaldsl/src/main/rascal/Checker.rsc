@@ -54,8 +54,7 @@ data MeasureAction = measureAction(int time=1);
 
 data Behavior = behavior(list[loc] triggerList = [], list[loc] actionList = [], str triggerListMod="ALL");
 data Task = task(list[loc] activityList = [], str activityType="TRIGGER", str activityListMod="ALL");
-data Mission = mission(list[Task] taskList = [], list[loc] behaviorList = []);
-
+data Mission = mission(list[Task] taskList = [], list[loc] behaviorList = [], tuple[list[loc], list[loc], list[loc]] feedbacks = <[], [], []>);
 
 // ADT constructors
 
@@ -117,6 +116,34 @@ list[loc] collectIdList(Collector c, idCollectList, role) {
           c.use(id, {role});
      }
      return result;
+}
+
+list[loc] collectFeedback(Collector c, feedback) {
+     feedbackList = collectIdList(c, feedback, actionId());
+     collect(feedback, c);
+     c.calculate("feedback idList check", feedback, [],
+     AType (Solver s) { 
+          checkIdList(s, feedback, [speakActionType(), ledActionType()], []);
+          return idListType();
+     });
+     return feedbackList;
+}
+
+tuple[list[loc], list[loc], list[loc]] collectFeedbacks(Collector c, mission) {
+     list[loc] feedbackStartList = [];
+     list[loc] feedbackEndList = [];
+     list[loc] feedbackTimeoutList = [];
+     if (/(MissionFeedback) `<MissionFeedback feedbacks>` := mission) {
+          if (/(MissionFeedback)`FEEDBACKS: {START <IDList startFeedback>, END <IDList? _>, TIMEOUT <IDList? _>}` := feedbacks) 
+               feedbackStartList += collectFeedback(c, startFeedback);
+
+          if (/(MissionFeedback)`FEEDBACKS: {START <IDList? _>, END <IDList endFeedback>, TIMEOUT <IDList? _>}` := feedbacks) 
+               feedbackEndList = collectFeedback(c, endFeedback);
+          
+          if (/(MissionFeedback)`FEEDBACKS: {START <IDList? _>, END <IDList? _>, TIMEOUT <IDList timeoutFeedback>}` := feedbacks)
+               feedbackTimeoutList = collectFeedback(c, timeoutFeedback);
+     }
+     return <feedbackStartList, feedbackEndList, feedbackTimeoutList>;
 }
 
 int computeDistance(distance) {
@@ -452,28 +479,32 @@ Task collectTask(Collector c, task_in) {
 
 //definitions
 // 1 task, 1 bhv
-void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <Task task> WHILE <ID idBhv>`,  Collector c) {
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <Task task> WHILE <ID idBhv> <MissionFeedback? missionFeedback>`,  Collector c) {
      task_res = collectTask(c, task);
      c.use(idBhv, {behaviorId()});
+
      dt = defType(missionType());
-     dt.mission = [mission(taskList=[task_res], behaviorList=[idBhv.src])];
+     dt.mission = [mission(taskList=[task_res], behaviorList=[idBhv.src], feedbacks=collectFeedbacks(c, missionFeedback))];
      c.define("<idNew>", missionId(), idNew, dt);
 }
 
 // 1 task, n bhv
-void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <Task task> WHILE <IDList idBhvs>`,  Collector c) {
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <Task task> WHILE <IDList idBhvs> <MissionFeedback? missionFeedback>`,  Collector c) {
      task_res = collectTask(c, task);
 
      behaviorList = collectIdList(c, idBhvs, behaviorId());
      collect(idBhvs, c);
 
+     feedbacks = <[], [], []>;
+     if (current has missionFeedback) feedbacks = collectFeedbacks(c, missionFeedback);
+
      dt = defType(missionType());
-     dt.mission = [mission(taskList=[task_res], behaviorList=behaviorList)];
+     dt.mission = [mission(taskList=[task_res], behaviorList=behaviorList, feedbacks=collectFeedbacks(c, missionFeedback))];
      c.define("<idNew>", missionId(), idNew, dt);
 }
 
 // n task, 1 bhv
-void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <TaskList tasks> WHILE <ID idBhv>`,  Collector c) {
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <TaskList tasks> WHILE <ID idBhv> <MissionFeedback? missionFeedback>`,  Collector c) {
      c.use(idBhv, {behaviorId()});
 
      taskList_res = [];
@@ -481,13 +512,16 @@ void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <TaskList tasks> WHI
           taskList_res += collectTask(c, task_in);
      } 
 
+     feedbacks = <[], [], []>;
+     // if (current has missionFeedback) feedbacks = collectFeedbacks(c, missionFeedback);
+
      dt = defType(missionType());
-     dt.mission = [mission(taskList=taskList_res, behaviorList=[idBhv.src])];
+     dt.mission = [mission(taskList=taskList_res, behaviorList=[idBhv.src], feedbacks=collectFeedbacks(c, missionFeedback))];
      c.define("<idNew>", missionId(), idNew, dt);
 }
 
 // n task, n bhv
-void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <TaskList tasks> WHILE <IDList idBhvs>`,  Collector c) {
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <TaskList tasks> WHILE <IDList idBhvs> <MissionFeedback? missionFeedback>`,  Collector c) {
      behaviorList = collectIdList(c, idBhvs, behaviorId());
      collect(idBhvs, c);
 
@@ -496,8 +530,11 @@ void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <TaskList tasks> WHI
           taskList_res += collectTask(c, task_in);
      }
 
+     feedbacks = <[], [], []>;
+     // if (current has missionFeedback) feedbacks = collectFeedbacks(c, missionFeedback);
+
      dt = defType(missionType());
-     dt.mission = [mission(taskList=taskList_res, behaviorList=behaviorList)];
+     dt.mission = [mission(taskList=taskList_res, behaviorList=behaviorList, feedbacks=collectFeedbacks(c, missionFeedback))];
      c.define("<idNew>", missionId(), idNew, dt);
 }
 
