@@ -163,16 +163,16 @@ class Controller():
 DEBUG = False
 
 
-from ev3dev2.motor import SpeedPercent, MoveDifferential, MediumMotor, OUTPUT_A, OUTPUT_B, OUTPUT_C
-from ev3dev2.display import Display
-from ev3dev2.wheel import EV3EducationSetTire
-from ev3dev2.sound import Sound
-from ev3dev2.led import Leds
-from ev3dev2.sensor.lego import ColorSensor, TouchSensor, UltrasonicSensor
-from ev3dev2._platform.ev3 import INPUT_1, INPUT_2, INPUT_3, INPUT_4
-import bluetooth, threading, random, time
+#!/usr/bin/env python3
+
+DEBUG = True
 if DEBUG:
     from ev3devlogging import timedlog
+import random
+from ev3dev2.motor import SpeedPercent
+from ev3dev2.sound import Sound
+import bluetooth, threading, time
+
 
 SOUND_NO_BLOCK = Sound.PLAY_NO_WAIT_FOR_COMPLETE # sound option that doesn\'t block the program
 BASE_SPEED = 20
@@ -189,7 +189,6 @@ def set_leds_color(leds, color):
        color = \"AMBER\"
     leds.set_color(\"LEFT\", color) 
     leds.set_color(\"RIGHT\", color)
-
 
 def feedback_leds_blocking(leds, color): # for generated code
     set_leds_color(leds, color)
@@ -275,6 +274,22 @@ class Motor():
             speed = self.base_speed * speedM
         self.motor.to_coordinates(x, y, SpeedPercent(speed), block=block, brake=brake)
 
+    # def log_reset(self):
+    #     self.log_distance = 0
+    #     self.log_angle = 0
+    
+    # def log_distance(self, distance):
+    #     self.log_distance += distance
+    
+    # def log_angle(self, angle):
+    #     self.log_angle += angle
+    
+    # def get_log_distance(self):
+    #     return self.log_distance
+    
+    # def get_log_angle(self):
+    #     return self.log_angle
+
     @property
     def is_running(self):
         return self.motor.is_running
@@ -330,7 +345,7 @@ class TaskRegistry():
         return self.tasks[task_name][trigger_index] if trigger_index is not None else self.tasks[task_name]
     
     def task_done(self, task_name):
-        return all(self.tasks[task_name].values())
+        return all(self.tasks[task_name])
 
     def all_tasks_done(self):
         return all([self.task_done(task_name) for task_name in self.tasks])
@@ -446,22 +461,6 @@ class BluetoothConnection():
             self.server_sock.close()
 
 
-def read_touch_sensor(touch_sensor):
-    \"\"\"
-    Reads the touch sensor and returns the distance.
-    @param color_sensor: The touch sensor to read
-    @return: The touch that was read
-    \"\"\"
-    lock = threading.Lock()
-    
-    with lock:
-        try:
-            touch = touch_sensor.is_pressed
-        except: 
-            if DEBUG:
-                timedlog(\"Touch sensor wrong read\")
-            return read_touch_sensor(touch_sensor)
-        return touch
 def read_color_sensor(cs):  
     \"\"\"
     Reads the color sensor and returns the color that was read.
@@ -469,6 +468,7 @@ def read_color_sensor(cs):
     @return: The color that was read
     \"\"\"
     lock = threading.Lock()
+
     with lock:
         try:
             color = cs.color
@@ -485,6 +485,7 @@ def read_ultrasonic_sensor(ultrasonic_sensor):
     @return: The distance that was read
     \"\"\"
     lock = threading.Lock()
+    
     with lock:
         try:
             distance = ultrasonic_sensor.value()
@@ -494,37 +495,61 @@ def read_ultrasonic_sensor(ultrasonic_sensor):
             return read_ultrasonic_sensor(ultrasonic_sensor)
         return distance
 
+def read_touch_sensor(touch_sensor):
+    \"\"\"
+    Reads the touch sensor and returns the distance.
+    @param color_sensor: The touch sensor to read
+    @return: The touch that was read
+    \"\"\"
+    lock = threading.Lock()
+    
+    with lock:
+        try:
+            touch = touch_sensor.is_pressed
+        except: 
+            if DEBUG:
+                timedlog(\"Touch sensor wrong read\")
+            return read_touch_sensor(touch_sensor)
+        return touch
 
 
+
+import random
+
+from ev3dev2.motor import MoveDifferential, MediumMotor, OUTPUT_A, OUTPUT_B, OUTPUT_C
+from ev3dev2.wheel import EV3EducationSetTire
+from ev3dev2.sound import Sound
+from ev3dev2.led import Leds
+from ev3dev2.sensor.lego import ColorSensor, UltrasonicSensor
+from ev3dev2._platform.ev3 import INPUT_1, INPUT_2, INPUT_3, INPUT_4
+from Subs_arch import Behavior
+from commons import *
+if DEBUG:
+    from ev3devlogging import timedlog
+
+
+
+CS_L, CS_M, CS_R, US_B, M_L, M_R, M_A, LEFT, RIGHT = INPUT_1, INPUT_2, INPUT_3, INPUT_4, OUTPUT_A, OUTPUT_B, OUTPUT_C, -1, 1
+
+CS_L, CS_M, CS_R, US_B, move_differential, arm_steering, LEDS, S = ColorSensor(CS_L), ColorSensor(CS_M), ColorSensor(CS_R), UltrasonicSensor(US_B), MoveDifferential(M_L, M_R, wheel_class=EV3EducationSetTire, wheel_distance_mm=123), MediumMotor(M_A), Leds(), Sound()
+
+US_B.mode = \'US-DIST-CM\'
+MOTOR = Motor(move_differential)
+ARM = ArmMotor(arm_steering)
+
+READINGS_DICT = {\"TS_L\": False, \"TS_R\": False, \"TS_B\": False, \"US_F\": 1000, \"US_B\": 1000, \"CS_R\": None, \"CS_M\": None, \"CS_L\": None}
+TASK_REGISTRY = TaskRegistry()
+TASK_REGISTRY.add(\"RunningBhv\")
 
 class RunningBhv(Behavior):
-    \"\"\"
-    Default behavior that will run if no other behavior is running, to keep the robot moving while its completing tasks
-    \"\"\"
-    
-    def __init__(self, motor, leds=False, task_registry=None):
-        \"\"\"
-        Initialize the behavior
-        @param motor: the motor to use
-        @param leds: the leds to use
-        @param task_registry: the task registry to check
-        \"\"\"
+
+    def __init__(self):
         Behavior.__init__(self)
         self.supressed = False
-        self.motor = motor
-        self.leds = leds
-        self.task_registry = task_registry
 
     def check(self):
-        \"\"\"
-        Always returns true if it has task to complete
-        @return: True
-        @rtype: bool
-        \"\"\"
-        if self.task_registry is None:
-            return True
 
-        return not self.task_registry.tasks_done()
+        return not TASK_REGISTRY.all_tasks_done()
 
     def action(self):
         \"\"\"
@@ -536,14 +561,14 @@ class RunningBhv(Behavior):
             timedlog(\"Moving\")
         
         # while not self.supressed:
-        #     self.motor.run(forward=True, distance=10, brake=False)
-        #     while self.motor.is_running and not self.supressed:
+        #     MOTOR.run(forward=True, distance=10, brake=False)
+        #     while MOTOR.is_running and not self.supressed:
         #         pass
         #     if not self.supressed:
-        #         self.motor.apply_momentum()
+        #         MOTOR.apply_momentum()
 
-        self.motor.run(forward=True, distance=1000, brake=False, speedM=1.3)
-        while self.motor.is_running and not self.supressed:
+        MOTOR.run(forward=True, distance=1000, brake=False, speedM=1.3)
+        while MOTOR.is_running and not self.supressed:
             pass
 
         return not self.supressed
@@ -553,7 +578,7 @@ class RunningBhv(Behavior):
         \"\"\"
         Suppress the behavior
         \"\"\"
-        self.motor.stop()
+        MOTOR.stop()
         self.supressed = True
         if DEBUG:
             timedlog(\"Moving suppressed\")
@@ -564,23 +589,11 @@ class CliffAvoidanceBhv(Behavior):
     This behavior will check if the robot is on falling off the cliff
     \"\"\"
 
-    def __init__(self, back_ult, motor, leds=False, sound=False, heigth_treshold=60):
-        \"\"\"
-        Initialize the behavior
-        @param back_ult: The back ultrasonic sensor to use
-        @param motor: the motor to use
-        @param leds: the leds to use
-        @param sound: the sound to use
-        @param heigth_treshold: The treshold distance (from the table) for the ultrasonic sensor
- 
-        \"\"\"
+    def __init__(self, heigth_treshold_min=120, heigth_treshold_max=400):
         Behavior.__init__(self)
         self.supressed = False
-        self.back_ult = back_ult
-        self.motor = motor
-        self.leds = leds
-        self.sound = sound
-        self.heigth_treshold = heigth_treshold        
+        self.heigth_treshold_min = heigth_treshold_min
+        self.heigth_treshold_max = heigth_treshold_max   
 
         self.back_cliff = False
         self.operations = []
@@ -593,8 +606,9 @@ class CliffAvoidanceBhv(Behavior):
         @return: True if the ultrasonic sensor detect a cliff
         @rtype: bool
         \"\"\"
-        back_sensor = read_ultrasonic_sensor(self.back_ult)
-        back_cliff = back_sensor \> self.heigth_treshold and back_sensor \< 2550  # when the sensor is too close to the ground it returns 2550
+
+        back_sensor = READINGS_DICT[\"US_B\"]
+        back_cliff = back_sensor \> self.heigth_treshold_min and back_sensor \< self.heigth_treshold_max
 
         if back_cliff != self.back_cliff:
             self.back_cliff = back_cliff
@@ -607,16 +621,13 @@ class CliffAvoidanceBhv(Behavior):
 
     def _get_operations(self, back):
         if back: # back cliff behind the robot
-            return [lambda: self.motor.turn(degrees=5), lambda: self.motor.run(forward=True, speedM=0.5, distance=5)]
-
-        if DEBUG:
-            timedlog(\"Back sensors: \" + str(back))
+            return [lambda: MOTOR.turn(degrees=5), lambda: MOTOR.run(forward=True, speedM=0.5, distance=3)]
 
         return []
     
     def _reset(self):
         self.back_cliff = False
-        self.motor.stop()
+        MOTOR.stop()
 
 
     def action(self):
@@ -624,14 +635,14 @@ class CliffAvoidanceBhv(Behavior):
         Change direction to step away from the border
         \"\"\"
 
-        # operations = self._get_operations(self.edge[\"left\"], self.edge[\"mid\"], self.edge[\"right\"], self.back_cliff)
+        self.fire = True
         self.supressed = False
         if DEBUG:
             timedlog(\"Cliff avoidance \" + str(self.back_cliff))
 
         for operation in self.operations:
             operation()
-            while self.motor.is_running and not self.supressed:
+            while MOTOR.is_running and not self.supressed:
                 pass
             if self.supressed:
                 break
@@ -646,7 +657,7 @@ class CliffAvoidanceBhv(Behavior):
         \"\"\"
         Suppress the behavior
         \"\"\"
-        self.motor.stop()
+        MOTOR.stop()
         self.supressed = True
         if DEBUG:
             timedlog(\"Cliff avoidance suppressed\")
@@ -657,27 +668,14 @@ class EdgeAvoidanceBhv(Behavior):
     This behavior will check if the robot is on the black border, and tries to step away from it
     \"\"\"
 
-    def __init__(self, left_cs, mid_cs, right_cs, motor, leds=False, sound=False, edge_color=\"white\"):
+    def __init__(self, edge_color=\"white\"):
         \"\"\"
         Initialize the behavior
-        @param left_cs: The left color sensor to use
-        @param mid_cs: The middle color sensor to use
-        @param right_cs: The right color sensor to use
-        @param back_ult: The back ultrasonic sensor to use
-        @param motor: the motor to use
-        @param leds: the leds to use
-        @param sound: the sound to use
         @param heigth_treshold: The treshold distance (from the table) for the ultrasonic sensor
  
         \"\"\"
         Behavior.__init__(self)
         self.supressed = False
-        self.left_cs = left_cs
-        self.mid_cs = mid_cs
-        self.right_cs = right_cs
-        self.motor = motor
-        self.leds = leds
-        self.sound = sound
 
         self.edge = {\"left\": False, \"mid\": False, \"right\": False}
         self.left_c, self.mid_c, self.right_c = \"black\", \"black\", \"black\"
@@ -692,7 +690,8 @@ class EdgeAvoidanceBhv(Behavior):
         @return: True if the color sensor is on a white surface
         @rtype: bool
         \"\"\"
-        self.left_c, self.mid_c, self.right_c = read_color_sensor(self.left_cs), read_color_sensor(self.mid_cs), read_color_sensor(self.right_cs)
+
+        self.left_c, self.mid_c, self.right_c = READINGS_DICT[\"CS_L\"], READINGS_DICT[\"CS_M\"], READINGS_DICT[\"CS_R\"]
 
         left_edge = self.left_c == self.edge_color
         mid_edge = self.mid_c == self.edge_color 
@@ -714,57 +713,51 @@ class EdgeAvoidanceBhv(Behavior):
     def _get_operations(self, left, mid, right):
         
         if all([left, mid, right]):  # all sensors on the edge
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(degrees=60)]
+            return [lambda: MOTOR.run(forward=False, distance=4), lambda: MOTOR.turn(degrees=60)]
         
         if all([left, right]):  # left and right sensors on the edge
-            return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(degrees=60)]
+            return [lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(degrees=60)]
         
         if all([left, mid]):  # left and mid sensors on the edge
-            return [lambda: self.motor.run(forward=False, distance=8), lambda: self.motor.turn(direction=RIGHT, degrees=30)]
+            return [lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=RIGHT, degrees=30)]
         
         if all([mid, right]):  # mid and right sensors on the edge
-            return [lambda: self.motor.run(forward=False, distance=8), lambda: self.motor.turn(direction=LEFT, degrees=30)]
+            return [lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=LEFT, degrees=30)]
 
         if left:  # left sensor on the edge
             if self.right_c == \"black\":
-                return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=RIGHT, degrees=30)]
+                return [lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=RIGHT, degrees=30)]
             else:
-                return [lambda: self.motor.run(forward=True, speedM=0.5, distance=3), lambda: self.motor.turn(direction=RIGHT, degrees=20), lambda: self.motor.run(forward=False, distance=5)]
+                return [lambda: MOTOR.run(forward=True, speedM=0.5, distance=3), lambda: MOTOR.turn(direction=RIGHT, degrees=20), lambda: MOTOR.run(forward=False, distance=5)]
 
         if right:  # right sensor on the edge
             if self.left_c == \"black\":
-                return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=LEFT, degrees=30)]
+                return [lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=LEFT, degrees=30)]
             else:
-                return [lambda: self.motor.run(forward=True, speedM=0.5, distance=3), lambda: self.motor.turn(direction=LEFT, degrees=20), lambda: self.motor.run(forward=False, distance=5)]
+                return [lambda: MOTOR.run(forward=True, speedM=0.5, distance=3), lambda: MOTOR.turn(direction=LEFT, degrees=20), lambda: MOTOR.run(forward=False, distance=5)]
         
         if mid: # mid sensor on the edge
             direction = RIGHT if self.right_c == \"black\" else LEFT
-            return [lambda: self.motor.run(forward=False, distance=3), lambda: self.motor.turn(direction=direction, degrees=15)]
-
-
-        if DEBUG:
-            timedlog(\"Edge sensors: \" + str(left) + \" \" + str(mid) + \" \" + str(right))
+            return [lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=direction, degrees=30)]
 
         return []
 
     def _reset(self):
         self.edge = {\"left\": False, \"mid\": False, \"right\": False}
-        self.motor.stop()
+        MOTOR.stop()
 
 
     def action(self):
         \"\"\"
         Change direction to step away from the border
         \"\"\"
-
-        # operations = self._get_operations(self.edge[\"left\"], self.edge[\"mid\"], self.edge[\"right\"], self.back_cliff)
         self.supressed = False
         if DEBUG:
             timedlog(\"Edge collision \" + str(self.edge))
-        avoid_stuck = [lambda: self.motor.run(forward=False, distance=20), lambda: self.motor.turn(degrees=5)] if random.random() \< 0.2 else []
+        avoid_stuck = [lambda: MOTOR.run(forward=False, distance=10), lambda: MOTOR.turn(degrees=5)] if random.random() \< 0.1 else []
         for operation in avoid_stuck + self.operations:
             operation()
-            while self.motor.is_running and not self.supressed:
+            while MOTOR.is_running and not self.supressed:
                 pass
             if self.supressed:
                 break
@@ -780,7 +773,7 @@ class EdgeAvoidanceBhv(Behavior):
         \"\"\"
         Suppress the behavior
         \"\"\"
-        self.motor.stop()
+        MOTOR.stop()
         self.supressed = True
         if DEBUG:
             timedlog(\"Edge collision suppressed\")
@@ -790,7 +783,7 @@ class LakeAvoidanceBhv(Behavior):
     This behavior will check if the robot is on a lake, and tries to step away from it
     \"\"\"
 
-    def __init__(self, left_cs, mid_cs, right_cs, motor, leds=False, sound=False, lake_colors=[\"yellow\", \"blue\", \"red\", \"brown\"]):
+    def __init__(self, lake_colors=[\"yellow\", \"blue\", \"red\"]):
         \"\"\"
         Initialize the behavior
         @param left_cs: The left color sensor to use
@@ -804,15 +797,12 @@ class LakeAvoidanceBhv(Behavior):
         \"\"\"
         Behavior.__init__(self)
         self.supressed = False
-        self.left_cs = left_cs
-        self.mid_cs = mid_cs
-        self.right_cs = right_cs
-        self.motor = motor
-        self.leds = leds
-        self.sound = sound
+        # self.measure = measure
+        # self.last_color = None
 
         self.edge = {\"left\": False, \"mid\": False, \"right\": False, \"mid_nc\": False}
         self.lake_colors = lake_colors
+        self.detected_colors = {color: False for color in self.lake_colors}
         self.operations = []
 
 
@@ -823,11 +813,15 @@ class LakeAvoidanceBhv(Behavior):
         @return: True if the color sensor is on a black surface
         @rtype: bool
         \"\"\"
-        mid_color = read_color_sensor(self.mid_cs)
 
-        left_edge = read_color_sensor(self.left_cs) in self.lake_colors  # note maybe we should check against the table color instead of the edge color
+        
+        mid_color = READINGS_DICT[\"CS_M\"]
+        left_color = READINGS_DICT[\"CS_L\"]
+        right_color = READINGS_DICT[\"CS_R\"]
+
+        left_edge = left_color in self.lake_colors  # note maybe we should check against the table color instead of the edge color
         mid_edge = mid_color in self.lake_colors
-        right_edge = read_color_sensor(self.right_cs) in self.lake_colors
+        right_edge = right_color in self.lake_colors
         mid_nc = mid_color == \"nocolor\"
 
         if left_edge != self.edge[\"left\"] or mid_edge != self.edge[\"mid\"] or right_edge != self.edge[\"right\"] or mid_nc != self.edge[\"mid_nc\"]:
@@ -836,35 +830,80 @@ class LakeAvoidanceBhv(Behavior):
             self.edge[\"right\"] = right_edge
             self.edge[\"mid_nc\"] = mid_nc
             
-            if any([left_edge, mid_edge, right_edge, mid_nc]):
+            if any([left_edge, mid_edge, right_edge]):
+                
+                # if self.measure:
+                #     timedlog(self.detected_colors)
+                #     color = next((color for color in [left_color, mid_color, right_color] if color in self.lake_colors), None)
+                #     if color is not None:
+                #         if self.detected_colors[color]:
+                #             self.operations = self._get_operations(left_edge, mid_edge, right_edge, mid_nc)
+                #         else:
+                #             self.last_color = next((c for c in self.lake_colors if not self.detected_colors[c]), None)
+                #             timedlog(\"LAST COLOR -----------------------\")
+                #             timedlog(self.last_color)
+                #             self.operations = self._get_operations_measure(left_edge, mid_edge, right_edge, mid_nc)
+                #     else:
+                #         self.operations = self._get_operations(left_edge, mid_edge, right_edge, mid_nc)
+                # else:
+                #     self.operations = self._get_operations(left_edge, mid_edge, right_edge, mid_nc)
                 self.operations = self._get_operations(left_edge, mid_edge, right_edge, mid_nc)
+                
                 return True
 
         return False
     
 
+    # def _get_operations_measure(self, left, mid, right, mid_nc):
+    #     if all([left, mid]):
+    #         return [lambda: MOTOR.turn(direction=LEFT, degrees=5), 
+    #                 lambda: self.arm_motor.move(up=False, block=True), lambda: self.arm_motor.move(block=True),
+    #                 lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=LEFT, degrees=40)]
+        
+    #     if all([mid, right]):
+    #         return [lambda: MOTOR.turn(direction=RIGHT, degrees=5), 
+    #                 lambda: self.arm_motor.move(up=False, block=True), lambda: self.arm_motor.move(block=True),
+    #                 lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=RIGHT, degrees=40)]
+        
+    #     if left:
+    #         return [lambda: MOTOR.turn(direction=LEFT, degrees=15), 
+    #                 lambda: self.arm_motor.move(up=False, block=True), lambda: self.arm_motor.move(block=True),
+    #                 lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=LEFT, degrees=20)]
+
+    #     if right:
+    #         return [lambda: MOTOR.turn(direction=RIGHT, degrees=15), 
+    #                 lambda: self.arm_motor.move(up=False, block=True), lambda: self.arm_motor.move(block=True),
+    #                 lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=RIGHT, degrees=20)]
+                        
+    #     if mid:
+    #         return [lambda: self.arm_motor.move(up=False, block=True), lambda: self.arm_motor.move(block=True),
+    #                 lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(degrees=40)]
+
+    #     return []
+
+
     def _get_operations(self, left, mid, right, mid_nc):
         
         if all([left, mid]):  # left and mid sensors on the edge
-            return [lambda: self.motor.turn(direction=LEFT, degrees=40)]
+            return [lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=LEFT, degrees=40)]
 
     
         if all([mid, right]):  # mid and right sensors on the edge
-            return [lambda: self.motor.turn(direction=RIGHT, degrees=40)]
+            return [lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=RIGHT, degrees=40)]
 
         
         if left:  # left sensor on the edge
-            return [lambda: self.motor.turn(direction=RIGHT, degrees=15)]
+            return [lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=RIGHT, degrees=20)]
 
         if right:  # right sensor on the edge
-            return [lambda: self.motor.turn(direction=LEFT, degrees=15)]
+            return [lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=LEFT, degrees=20)]
         
         
         if mid:  # left sensor on the edge
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(degrees=45)]
+            return [lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(degrees=40)]
         
         if mid_nc:  # mid sensor on the void (caused by some movements)
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(degrees=45)]
+            return [lambda: MOTOR.run(forward=False, distance=5), lambda: MOTOR.turn(degrees=40)]
 
         if DEBUG:
             timedlog(\"Lake sensors: \" + str(left) + \" \" + str(mid) + \" \" + str(right) + \" \")
@@ -873,7 +912,7 @@ class LakeAvoidanceBhv(Behavior):
 
     def _reset(self):
         self.edge = {\"left\": False, \"mid\": False, \"right\": False, \"mid_nc\": False}
-        self.motor.stop()
+        MOTOR.stop()
 
 
     def action(self):
@@ -881,16 +920,18 @@ class LakeAvoidanceBhv(Behavior):
         Change direction to step away from the border
         \"\"\"
 
-        # operations = self._get_operations(self.edge[\"left\"], self.edge[\"mid\"], self.edge[\"right\"])
         self.supressed = False
         if DEBUG:
-            timedlog(\"Lake collision\")
+            timedlog(\"Lake collision  \" + str(self.edge))
 
-        avoid_stuck = [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(degrees=5)] if random.random() \< 0.2 else []
+        avoid_stuck = [lambda: MOTOR.run(forward=False, distance=10), lambda: MOTOR.turn(degrees=5)] if random.random() \< 0.1 else []
         for operation in avoid_stuck + self.operations:
             operation()
-            while self.motor.is_running and not self.supressed:
+            while MOTOR.is_running and not self.supressed:
                 pass
+            # if self.last_color is not None:
+            #     self.detected_colors[self.last_color] = True
+            #     self.last_color = None
             if self.supressed:
                 break
         
@@ -904,7 +945,7 @@ class LakeAvoidanceBhv(Behavior):
         \"\"\"
         Suppress the behavior
         \"\"\"
-        self.motor.stop()
+        MOTOR.stop()
         self.supressed = True
         if DEBUG:
             timedlog(\"Lake collision suppressed\")
@@ -915,16 +956,9 @@ class UpdateSlaveReadings(Behavior):
     \"\"\"
         
    
-    def __init__(self, bluetooth_connection, readings_dict):
-        \"\"\"
-        Initialize the behavior
-        @param bluetooth_connection: The bluetooth connection to useù
-        @param readings_dict: The readings dictionary to update
-        
-        \"\"\"
+    def __init__(self):
         Behavior.__init__(self)
-        self.bluetooth_connection = bluetooth_connection
-        self.readings_dict = readings_dict
+
         self.data = \"\"
 
         self.direction = None
@@ -937,7 +971,7 @@ class UpdateSlaveReadings(Behavior):
         @rtype: bool
         \"\"\"
 
-        data = self.bluetooth_connection.get_data()
+        data = BLUETOOTH_CONNECTION.get_data()
         if data != \"\":
             self.data = data
             self._update_readings_dict()
@@ -946,12 +980,78 @@ class UpdateSlaveReadings(Behavior):
     
     def _update_readings_dict(self):
         data = self.data.split(\",\")
-        self.readings_dict[\"touch_left\"] = bool(int(data[0]))
-        self.readings_dict[\"touch_right\"] = bool(int(data[1]))
-        self.readings_dict[\"touch_back\"] = bool(int(data[2]))
-        self.readings_dict[\"ult_front\"] = int(data[3])
+        READINGS_DICT[\"touch_left\"] = bool(int(data[0]))
+        READINGS_DICT[\"touch_right\"] = bool(int(data[1]))
+        READINGS_DICT[\"touch_back\"] = bool(int(data[2]))
+        READINGS_DICT[\"ult_front\"] = int(data[3])
+        
 
-        # log = \"Readings: \" + str(self.readings_dict[\'touch_left\']) + \",\" + str(self.readings_dict[\'touch_right\']) + \",\" + str(self.readings_dict[\'touch_back\']) + \",\" + str(self.readings_dict[\'ult_front\'])
+        if DEBUG:
+            timedlog(\"Readings: \" + str(READINGS_DICT))
+
+        # log = \"Readings: \" + str(READINGS_DICT[\'touch_left\']) + \",\" + str(READINGS_DICT[\'touch_right\']) + \",\" + str(READINGS_DICT[\'touch_back\']) + \",\" + str(READINGS_DICT[\'ult_front\'])
+        # timedlog(log)
+            
+    def action(self):
+        \"\"\"
+        Do nothing
+        \"\"\"
+        return True
+
+
+
+    def suppress(self):
+        \"\"\"
+        Suppress the behavior
+        \"\"\"
+        pass
+
+
+class UpdateReadings(Behavior):
+    \"\"\"
+    This simple behavior, at each check cycle, will update the slave readings without doing anything else
+    \"\"\"
+        
+   
+    def __init__(self):
+        \"\"\"
+        Initialize the behavior
+        @param BLUETOOTH_CONNECTION: The bluetooth connection to useù
+        @param readings_dict: The readings dictionary to update
+        
+        \"\"\"
+        Behavior.__init__(self)
+        self.data = \"\"
+    
+    def check(self):
+        \"\"\"
+        Check if the bluetooth connection has recived a new reading
+        @return: True if the bluetooth connection has recived a new reading
+        @rtype: bool
+        \"\"\"
+
+        # data = self.BLUETOOTH_CONNECTION.get_data()
+        # if data != \"\":
+        #     self.data = data
+        #     self._update_readings_dict()
+
+        self._update_readings_dict()
+        
+        return False
+    
+    def _update_readings_dict(self):
+        # data = self.data.split(\",\")
+        # READINGS_DICT[\"TS_L\"] = bool(int(data[0]))
+        # READINGS_DICT[\"TS_R\"] = bool(int(data[1]))
+        # READINGS_DICT[\"TS_B\"] = bool(int(data[2]))
+        # READINGS_DICT[\"US_F\"] = int(data[3])
+
+        READINGS_DICT[\"CS_L\"] = read_color_sensor(CS_L)
+        READINGS_DICT[\"CS_M\"] = read_color_sensor(CS_M)
+        READINGS_DICT[\"CS_R\"] = read_color_sensor(CS_R)
+        READINGS_DICT[\"US_B\"] = read_ultrasonic_sensor(US_B)
+        
+        # log = \"Readings: \" + str(READINGS_DICT[\'touch_left\']) + \",\" + str(READINGS_DICT[\'touch_right\']) + \",\" + str(READINGS_DICT[\'touch_back\']) + \",\" + str(READINGS_DICT[\'ult_front\'])
         # timedlog(log)
             
     def action(self):
@@ -976,7 +1076,7 @@ class AvoidCollisionBhv(Behavior):
     This behavior will check if the front ultrasonic sensor dedect an object, and makes the robot avoid it
     \"\"\"
         
-    def __init__(self, readings_dict, motor, leds=False, sound=False, threshold_distance=300):
+    def __init__(self, threshold_distance=300):
         \"\"\"
         Initialize the behavior
         @param readings_dict: The readings dictionary to use for the ultrasonic front and touch back
@@ -987,12 +1087,7 @@ class AvoidCollisionBhv(Behavior):
         \"\"\"
         Behavior.__init__(self)
         self.supressed = False
-        self.motor = motor
-        self.leds = leds
-        self.sound = sound
         self.threshold_distance = threshold_distance        
-
-        self.readings_dict = readings_dict
         self.obj_front = False
         self.operations = []
 
@@ -1004,7 +1099,8 @@ class AvoidCollisionBhv(Behavior):
         @rtype: bool
         \"\"\"
         
-        obj_front = self.readings_dict[\"ult_front\"] \< self.threshold_distance
+        
+        obj_front = READINGS_DICT[\"ult_front\"] \< self.threshold_distance
 
         if obj_front != self.obj_front:
             self.obj_front = obj_front
@@ -1019,7 +1115,7 @@ class AvoidCollisionBhv(Behavior):
     
     def _get_operations(self, obj_front):
         if obj_front:
-            return [lambda: self.motor.turn(degrees=45)]
+            return [lambda: MOTOR.turn(degrees=45)]
             
         
     def action(self):
@@ -1033,7 +1129,7 @@ class AvoidCollisionBhv(Behavior):
         
         for operation in self.operations:
             operation()
-            while self.motor.is_running and not self.supressed:
+            while MOTOR.is_running and not self.supressed:
                 pass
             if self.supressed:
                 break
@@ -1046,7 +1142,7 @@ class AvoidCollisionBhv(Behavior):
         \"\"\"
         Suppress the behavior
         \"\"\"
-        self.motor.stop()
+        MOTOR.stop()
         self.suppressed = True
         if DEBUG:
             timedlog(\"Collision avoidance suppressed\")
@@ -1058,25 +1154,11 @@ class RecoverCollisionBhv(Behavior):
     This behavior will check if we had collide with something, and makes the robot recover from it
     \"\"\"
         
-    def __init__(self, readings_dict, motor, leds=False, sound=False):
-        \"\"\"
-        Initialize the behavior
-        @param readings_dict: The readings dictionary to use for the touch sensors left and right and touch back
-        @param motor: the motor to use
-        @param leds: the leds to use
-        @param sound: the sound to use
+    def __init__(self):
 
-        \"\"\"
         Behavior.__init__(self)
         self.supressed = False
-        self.motor = motor
-        self.leds = leds
-        self.sound = sound       
-
-        self.readings_dict = readings_dict
         self.operations = []
-
-
         self.obj_left = False
         self.obj_right = False
         self.obj_back = False
@@ -1089,9 +1171,9 @@ class RecoverCollisionBhv(Behavior):
         @rtype: bool
         \"\"\"
         
-        obj_left = self.readings_dict[\"touch_left\"]
-        obj_right = self.readings_dict[\"touch_right\"]
-        obj_back = self.readings_dict[\"touch_back\"]
+        obj_left = READINGS_DICT[\"touch_left\"]
+        obj_right = READINGS_DICT[\"touch_right\"]
+        obj_back = READINGS_DICT[\"touch_back\"]
 
 
         if obj_left != self.obj_left or obj_right != self.obj_right or obj_back != self.obj_back:
@@ -1114,13 +1196,13 @@ class RecoverCollisionBhv(Behavior):
         # if all([obj_left, obj_right, obj_back]): # stuck position
             # return []
         if all([obj_left, obj_right]): # left and right sensors touched
-            return [lambda: self.motor.run(forward=False, distance=10), lambda: self.motor.turn(degrees=40)]
+            return [lambda: MOTOR.run(forward=False, distance=10), lambda: MOTOR.turn(degrees=40)]
         if obj_left: # left sensor touched
-            return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=RIGHT, degrees=40)]
+            return [lambda: MOTOR.run(forward=False, distance=5), lambda: MOTOR.turn(direction=RIGHT, degrees=40)]
         if obj_right: # right sensor touched
-            return [lambda: self.motor.run(forward=False, distance=5), lambda: self.motor.turn(direction=LEFT, degrees=40)]
+            return [lambda: MOTOR.run(forward=False, distance=5), lambda: MOTOR.turn(direction=LEFT, degrees=40)]
         if obj_back: # back sensor touched
-            return [lambda: self.motor.run(forward=True, distance=5)]
+            return [lambda: MOTOR.run(forward=True, distance=5)]
         
             
 
@@ -1135,7 +1217,7 @@ class RecoverCollisionBhv(Behavior):
         
         for operation in self.operations:
             operation()
-            while self.motor.is_running and not self.supressed:
+            while MOTOR.is_running and not self.supressed:
                 pass
             if self.supressed:
                 break
@@ -1147,31 +1229,24 @@ class RecoverCollisionBhv(Behavior):
         \"\"\"
         Suppress the behavior
         \"\"\"
-        self.motor.stop()
+        MOTOR.stop()
         self.suppressed = True
         if DEBUG:
             timedlog(\"Collision recover suppressed\")
 
-CS_L, CS_M, CS_R, US_B, M_L, M_R, M_A, LEFT, RIGHT = INPUT_1, INPUT_2, INPUT_3, INPUT_4, OUTPUT_A, OUTPUT_B, OUTPUT_C, -1, 1
-
-CS_L, CS_M, CS_R, US_B, move_differential, arm_steering, LEDS, S = ColorSensor(CS_L), ColorSensor(CS_M), ColorSensor(CS_R), UltrasonicSensor(US_B), MoveDifferential(M_L, M_R, wheel_class=EV3EducationSetTire, wheel_distance_mm=123), MediumMotor(M_A), Leds(), Sound()
-
-US_B.mode = \'US-DIST-CM\'
-MOTOR = Motor(move_differential)
-ARM = ArmMotor(arm_steering)
 
 CONTROLLER = Controller(return_when_no_action=True)
 
 
-master_mac = \'78:DB:2F:2B:5D:98\'
+master_mac = \'00:17:E9:B4:CE:E6\'
 master = True
 
-BLUETOOTH_CONNECTION = BluetoothConnection(master, master_mac, debug=DEBUG)
-READINGS_DICT = {\"touch_left\": False, \"touch_right\": False, \"touch_back\": False, \"ult_front\": 1000}
+# bluetooth_connection = BluetoothConnection(master, master_mac, debug=DEBUG)
+
 
 # task_registry = TaskRegistry()
 
-s.speak(\'Start\')
+S.speak(\'Start\')
 if DEBUG:
     timedlog(\"Starting\")
 
@@ -1179,20 +1254,27 @@ if DEBUG:
 
 
 
-CONTROLLER.add(UpdateSlaveReadings(BLUETOOTH_CONNECTION, READINGS_DICT))
-CONTROLLER.add(CliffAvoidanceBhv(US_B, MOTOR))
-CONTROLLER.add(EdgeAvoidanceBhv(CS_L, CS_M, CS_R, MOTOR))
-CONTROLLER.add(LakeAvoidanceBhv(CS_L, CS_M, CS_R, MOTOR))
-CONTROLLER.add(RecoverCollisionBhv(READINGS_DICT, MOTOR))
-CONTROLLER.add(AvoidCollisionBhv(READINGS_DICT, MOTOR))
-CONTROLLER.add(RunningBhv(MOTOR, LEDS))
+##### GENERATED CODE GOES HERE #####
+##### GENERATED CODE GOES HERE #####
+##### GENERATED CODE GOES HERE #####
+
+# controller.add(UpdateSlaveReadings(bluetooth_connection, readings_dict))
+CONTROLLER.add(UpdateReadings())
+CONTROLLER.add(CliffAvoidanceBhv())
+CONTROLLER.add(EdgeAvoidanceBhv())
+CONTROLLER.add(LakeAvoidanceBhv())
+# CONTROLLER.add(RecoverCollisionBhv(readings_dict, motor))
+# controller.add(AvoidCollisionBhv(readings_dict, motor))
+CONTROLLER.add(RunningBhv())
 
 
+##### GENERATED CODE GOES HERE #####
+##### GENERATED CODE GOES HERE #####
+##### GENERATED CODE GOES HERE #####
 
 
-
-BLUETOOTH_CONNECTION.start_listening(lambda data: ())
-controller.start()
+# bluetooth_connection.start_listening(lambda data: ())
+CONTROLLER.start()
 
 S.speak(\"stop\")
             '";

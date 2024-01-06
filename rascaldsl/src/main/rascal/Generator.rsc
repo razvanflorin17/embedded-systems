@@ -18,7 +18,7 @@ import Checker;
 void main() {
     inFile = |project://rascaldsl/instance/spec1.tdsl|;
     cst = parsePlanning(inFile);
-    static_code = Static_code_generator();
+    static_code = static_code_generator();
     rVal = generator(cst, static_code[0], static_code[1]);
     println(rVal);
 }
@@ -35,9 +35,9 @@ DefInfo findReferenceFromSrc(TModel tm, src) {
     throw "Fix references in language instance";
 }
 
-str generator(cst, static_code, master_bhvs) { // WIP
+str generator(cst, str static_code, tuple[str, str] master_bhvs) { // WIP
     tm = modulesTModelFromTree(cst);
-    retVal = "";
+    str retVal = static_code;
     trigger_list = [];
     action_list = [];
     if(/(RoverConfig) `Rover: <IDList missions> MAC: <STR mac>` := cst) {
@@ -48,8 +48,8 @@ str generator(cst, static_code, master_bhvs) { // WIP
         trigger_map = tmp_ret[1];
         action_map = tmp_ret[2];
 
-        retVal = "
-        '
+        retVal += "
+        '<static_code>\n\n\n\n\n\n\n\n\n
         '<mac>
         '
         '<bhv_list>
@@ -371,7 +371,7 @@ str printMissionRunningBhv(list[list[DefInfo]] action_task, list[int] action_sta
             j += 1;
         }
         else {
-            operations_init += printListLambda(["MOTOR.run(forward=True, distance=100, brake=False, speedM=1.3)", "(self.counter_action := 0)"]);
+            operations_init += printListLambda(["MOTOR.run(forward=True, distance=100, brake=False, speedM=1.3)", "(self.counter_action := -1)"]);
         }
     }
 
@@ -419,7 +419,7 @@ str printMissionRunningBhv(list[list[DefInfo]] action_task, list[int] action_sta
 }
 
 
-str printMissionsUsage(missions, tm, master_bhvs) {
+str printMissionsUsage(missions, tm, tuple[str, str] master_bhvs) {
     retVal = [];
     for (<mission> <- [<id> |/(ID) `<ID id>` := missions]) {
         DefInfo defInfo = findReference(tm, mission);
@@ -441,10 +441,11 @@ str printMissionsUsage(missions, tm, master_bhvs) {
                 feedback_end_operations += generateActionFeedback(feedback_operation);
             }
 
-            retVal += master_bhvs;
+            retVal += master_bhvs[0];
             for (behavior <- miss.behaviorList) {
                 retVal += "CONTROLLER.add(<getContent(behavior)>_bhv())";
             }
+            retVal += master_bhvs[1];
             retVal += "bluetooth_connection.start_listening(lambda data: ())
             's.speak(\'Start\') # REMOVE BEFORE DELIVERY
             '

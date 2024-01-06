@@ -9,6 +9,7 @@ import Relation;
 
 import Syntax;
 import Checker;
+import Static_Generator;
 import Generator;
 
 PathConfig pcfg = getProjectPathConfig(|project://rascaldsl|, mode=interpreter());
@@ -35,13 +36,13 @@ set[LanguageService] contribs() = {
 };
 
 value exec(gen(Planning p)) {
-    rVal = generator(p);
+    static_code = static_code_generator();
+    rVal = generator(p, static_code[0], static_code[1]);
     outputFile = |project://rascaldsl/instance/output/output.py|; 
     writeFile(outputFile, rVal);
     edit(outputFile);
     return ("result": true);
 }
-
 
 void main() {
     registerLanguage(tdslLang);

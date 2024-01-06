@@ -84,7 +84,7 @@ syntax RoverTrigger
 
 syntax ColorTrigger = "COLOR" ColorSensor colorSensor ColorReadable color;
 syntax ColorSensor = "left" | "right" | "mid";
-syntax ColorReadable = "black" | "blue" | "green" | "yellow" | "red" | "white" | "brown";
+syntax ColorReadable = "black" | "blue" | "yellow" | "red" | "white";
 
 syntax DistanceTrigger = "INDISTANCE" DistanceSensor distanceSensor Distance distanceThreshold;
 syntax DistanceSensor = "front" | "back";

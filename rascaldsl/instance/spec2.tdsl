@@ -1,5 +1,15 @@
-ta == COLOR mid black
-aa := FORWARD 1 30
+black_mid == COLOR mid black
+yellow_left == COLOR left yellow
+white_right == COLOR right white
 
-[{ANY [ta, aa]} , {ALLORD [aa]}, aa, [ta, aa]]
+notify := BEEP
+turn_360 := RIGHT 360° 15
 
+Behavior: notfy_white_right WHEN white_right DO notify^3
+
+border_lake_speech := SPEAK "Starting border lake mission"
+
+Mission: tmp EXECUTE {yellow_left 30s} WHILE notfy_white_right
+
+
+Rover: [tmp] MAC: "00:17:E9:B4:CE:E6"
