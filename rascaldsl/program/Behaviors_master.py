@@ -162,6 +162,7 @@ class EdgeAvoidanceBhv(Behavior):
         self.suppressed = False
 
         self.edge = {"left": False, "mid": False, "right": False}
+        self.triggering_state = self.edge
         self.left_c, self.mid_c, self.right_c = "black", "black", "black"
         self.edge_color = edge_color
         self.operations = []
@@ -189,6 +190,7 @@ class EdgeAvoidanceBhv(Behavior):
             
             if any([left_edge, mid_edge, right_edge]):
                 self.operations = self._get_operations(left_edge, mid_edge, right_edge)
+                self.triggering_state = self.edge
                 return True
 
         return False
@@ -237,7 +239,7 @@ class EdgeAvoidanceBhv(Behavior):
         """
         self.suppressed = False
         if DEBUG:
-            timedlog("Edge collision " + str(self.edge))
+            timedlog("Edge collision " + str(self.triggering_state))
         avoid_stuck = [lambda: MOTOR.run(forward=False, distance=10), lambda: MOTOR.turn(degrees=5)] if random.random() < 0.1 else []
         for operation in avoid_stuck + self.operations:
             operation()
@@ -285,6 +287,7 @@ class LakeAvoidanceBhv(Behavior):
         # self.last_color = None
 
         self.edge = {"left": False, "mid": False, "right": False, "mid_nc": False}
+        self.triggering_state = self.edge
         self.lake_colors = lake_colors
         self.detected_colors = {color: False for color in self.lake_colors}
         self.operations = []
@@ -315,7 +318,7 @@ class LakeAvoidanceBhv(Behavior):
             self.edge["mid_nc"] = mid_nc
             
             if any([left_edge, mid_edge, right_edge]):
-                
+                self.triggering_state = self.edge
                 # if self.measure:
                 #     timedlog(self.detected_colors)
                 #     color = next((color for color in [left_color, mid_color, right_color] if color in self.lake_colors), None)
@@ -406,7 +409,7 @@ class LakeAvoidanceBhv(Behavior):
 
         self.suppressed = False
         if DEBUG:
-            timedlog("Lake collision  " + str(self.edge))
+            timedlog("Lake collision  " + str(self.triggering_state))
 
         avoid_stuck = [lambda: MOTOR.run(forward=False, distance=10), lambda: MOTOR.turn(degrees=5)] if random.random() < 0.1 else []
         for operation in avoid_stuck + self.operations:

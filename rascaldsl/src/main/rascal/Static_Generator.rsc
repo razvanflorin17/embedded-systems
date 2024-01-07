@@ -2,7 +2,8 @@ module Static_Generator
 
 tuple[str, tuple[str, str]] static_code_generator() {
 
-            rVal = "# -*- coding: utf-8 -*-
+            rVal = "#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import threading
 
 
@@ -1058,7 +1059,7 @@ class UpdateReadings(Behavior):
         READINGS_DICT[\"CS_R\"] = read_color_sensor(CS_R)
         READINGS_DICT[\"US_B\"] = read_ultrasonic_sensor(US_B)
         
-        timedlog(\"Readings: \" + str(READINGS_DICT))
+        # timedlog(\"Readings: \" + str(READINGS_DICT))
         # log = \"Readings: \" + str(READINGS_DICT[\'touch_left\']) + \",\" + str(READINGS_DICT[\'touch_right\']) + \",\" + str(READINGS_DICT[\'touch_back\']) + \",\" + str(READINGS_DICT[\'ult_front\'])
         # timedlog(log)
             

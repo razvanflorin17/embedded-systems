@@ -2,14 +2,18 @@ black_mid == COLOR mid black
 yellow_left == COLOR left yellow
 white_right == COLOR right white
 
+touch_back == TOUCH back
+
 notify := BEEP
 turn_360 := RIGHT 360° 15
+drive_back_bit := BACKWARD 10m 15
 
 Behavior: notfy_white_right WHEN white_right DO notify^3
 
 border_lake_speech := SPEAK "Starting border lake mission"
 
-Mission: tmp EXECUTE {yellow_left 5min} WHILE notfy_white_right
+Mission: tmp EXECUTE [{yellow_left 5min}, notify^5] WHILE notfy_white_right
+Mission: drive_around EXECUTE {touch_back 30s} WHILE notfy_white_right
 
 
-Rover: [tmp] MAC: "00:17:E9:B4:CE:E6"
+Rover: [tmp, drive_around] MAC: "00:17:E9:B4:CE:E6"

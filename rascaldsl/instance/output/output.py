@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import threading
 
@@ -1054,7 +1055,7 @@ class UpdateReadings(Behavior):
         READINGS_DICT["CS_R"] = read_color_sensor(CS_R)
         READINGS_DICT["US_B"] = read_ultrasonic_sensor(US_B)
         
-        timedlog("Readings: " + str(READINGS_DICT))
+        # timedlog("Readings: " + str(READINGS_DICT))
         # log = "Readings: " + str(READINGS_DICT['touch_left']) + "," + str(READINGS_DICT['touch_right']) + "," + str(READINGS_DICT['touch_back']) + "," + str(READINGS_DICT['ult_front'])
         # timedlog(log)
             
@@ -1238,74 +1239,12 @@ class RecoverCollisionBhv(Behavior):
         if DEBUG:
             timedlog("Collision recover suppressed")
 
-"211"
+"00:17:E9:B4:CE:E6"
 
 
 
 
-class bb_bhv(Behavior):
-	def __init__(self):
-		Behavior.__init__(self)
-		self.suppressed = False
-		self.operations = []
-		self.counter_conds = 0
-		self.trigger_list = [lambda: READINGS_DICT["TS_L"], lambda: READINGS_DICT["CS_M"] == "black", lambda: READINGS_DICT["ULT_B"] < 10, lambda: READINGS_DICT["CS_L"] == "black"]
-		self.firing = False
-		self.to_fire = False
-
-
-	def _reset(self):
-		self.operations = []
-		MOTOR.stop()
-		self.counter_conds = 0
-		self.trigger_list = [lambda: READINGS_DICT["TS_L"], lambda: READINGS_DICT["CS_M"] == "black", lambda: READINGS_DICT["ULT_B"] < 10, lambda: READINGS_DICT["CS_L"] == "black"]
-		self.firing = False
-		self.to_fire = False
-
-
-	def check(self):
-		if not self.to_fire and not self.firing:
-			if self.trigger_list[self.counter_conds]():
-				self.counter_conds += 1
-				self.to_fire = (self.counter_conds == 4)
-		
-			if self.to_fire:
-				self.operations = [lambda: MOTOR.run(forward=True, distance=10, speed=30), lambda: S.beep()]
-		return self.to_fire and not self.firing
-
-
-
-	def action(self):
-		self.suppressed = False
-		self.firing = True
-		self.to_fire = False
-		if DEBUG:
-			timedlog("bb fired")
-
-		for operation in self.operations:
-			operation()
-			while MOTOR.is_running and not self.supressed:
-				pass
-			if self.supressed:
-				break
-
-		self._reset()
-
-		if DEBUG and not self.supressed:
-			timedlog("bb done")
-		return not self.supressed
-
-
-	def suppress(self):
-		MOTOR.stop()
-		self.supressed = True
-		if DEBUG:
-			timedlog("bb suppressed")
-
-
-
-
-class bc_bhv(Behavior):
+class notfy_white_right_bhv(Behavior):
 	def __init__(self):
 		Behavior.__init__(self)
 		self.suppressed = False
@@ -1323,10 +1262,10 @@ class bc_bhv(Behavior):
 
 	def check(self):
 		if not self.to_fire and not self.firing:
-			self.to_fire = (READINGS_DICT["CS_M"] == "black" or READINGS_DICT["CS_L"] == "black" or READINGS_DICT["ULT_B"] < 10)
+			self.to_fire = (READINGS_DICT["CS_R"] == "white")
 		
 			if self.to_fire:
-				self.operations = [lambda: MOTOR.run(forward=True, distance=10, speed=30), lambda: S.beep(), lambda: MOTOR.turn(direction="RIGHT", degrees=90, speed=30)]
+				self.operations = [lambda: S.beep(), lambda: S.beep(), lambda: S.beep()]
 		return self.to_fire and not self.firing
 
 
@@ -1336,391 +1275,48 @@ class bc_bhv(Behavior):
 		self.firing = True
 		self.to_fire = False
 		if DEBUG:
-			timedlog("bc fired")
+			timedlog("notfy_white_right fired")
 
 		for operation in self.operations:
 			operation()
-			while MOTOR.is_running and not self.supressed:
+			while MOTOR.is_running and not self.suppressed:
 				pass
-			if self.supressed:
+			if self.suppressed:
 				break
 
 		self._reset()
 
-		if DEBUG and not self.supressed:
-			timedlog("bc done")
-		return not self.supressed
+		if DEBUG and not self.suppressed:
+			timedlog("notfy_white_right done")
+		return not self.suppressed
 
 
 	def suppress(self):
 		MOTOR.stop()
-		self.supressed = True
+		self.suppressed = True
 		if DEBUG:
-			timedlog("bc suppressed")
+			timedlog("notfy_white_right suppressed")
 
 
 
 
-class bd_bhv(Behavior):
-	def __init__(self):
-		Behavior.__init__(self)
-		self.suppressed = False
-		self.operations = []
-		self.firing = False
-		self.to_fire = False
-
-
-	def _reset(self):
-		self.operations = []
-		MOTOR.stop()
-		self.firing = False
-		self.to_fire = False
-
-
-	def check(self):
-		if not self.to_fire and not self.firing:
-			self.to_fire = (READINGS_DICT["CS_M"] == "black" and READINGS_DICT["CS_L"] == "black" and READINGS_DICT["ULT_B"] < 10)
-		
-			if self.to_fire:
-				self.operations = [lambda: MOTOR.run(forward=True, distance=10, speed=30), lambda: S.beep(), lambda: MOTOR.turn(direction="RIGHT", degrees=90, speed=30), lambda: MOTOR.run(forward=True, distance=10, speed=30), lambda: ARM_MOTOR.move(up=False, rotations=1, block=True), lambda: time.sleep(36000), lambda: ARM_MOTOR.move(up=True, rotations=1, block=True), lambda: MOTOR.run(forward=True, distance=10, speed=30), lambda: S.beep(), lambda: MOTOR.turn(direction="RIGHT", degrees=90, speed=30)]
-		return self.to_fire and not self.firing
-
-
-
-	def action(self):
-		self.suppressed = False
-		self.firing = True
-		self.to_fire = False
-		if DEBUG:
-			timedlog("bd fired")
-
-		for operation in self.operations:
-			operation()
-			while MOTOR.is_running and not self.supressed:
-				pass
-			if self.supressed:
-				break
-
-		self._reset()
-
-		if DEBUG and not self.supressed:
-			timedlog("bd done")
-		return not self.supressed
-
-
-	def suppress(self):
-		MOTOR.stop()
-		self.supressed = True
-		if DEBUG:
-			timedlog("bd suppressed")
-
-
-
-
-class ba_bhv(Behavior):
-	def __init__(self):
-		Behavior.__init__(self)
-		self.suppressed = False
-		self.operations = []
-		self.firing = False
-		self.to_fire = False
-
-
-	def _reset(self):
-		self.operations = []
-		MOTOR.stop()
-		self.firing = False
-		self.to_fire = False
-
-
-	def check(self):
-		if not self.to_fire and not self.firing:
-			self.to_fire = (READINGS_DICT["CS_M"] == "black")
-		
-			if self.to_fire:
-				self.operations = [lambda: MOTOR.run(forward=True, distance=10, speed=30), lambda: MOTOR.run(forward=True, distance=10, speed=30), lambda: MOTOR.run(forward=True, distance=10, speed=30)]
-		return self.to_fire and not self.firing
-
-
-
-	def action(self):
-		self.suppressed = False
-		self.firing = True
-		self.to_fire = False
-		if DEBUG:
-			timedlog("ba fired")
-
-		for operation in self.operations:
-			operation()
-			while MOTOR.is_running and not self.supressed:
-				pass
-			if self.supressed:
-				break
-
-		self._reset()
-
-		if DEBUG and not self.supressed:
-			timedlog("ba done")
-		return not self.supressed
-
-
-	def suppress(self):
-		MOTOR.stop()
-		self.supressed = True
-		if DEBUG:
-			timedlog("ba suppressed")
-
-
-
-
-class ma_controllerBhv(Behavior):
+class drive_around_controllerBhv(Behavior):
 	def __init__(self):
 		Behavior.__init__(self)
 		self.executing_state = 0
+		self.counter_action = 0
 		self.running_actions_done = False
 		self.fired = False
 		self.timer = 0
 		self.timeouted = False
 		TASK_REGISTRY.add("state_0", 1)
-		TASK_REGISTRY.add("state_1", 1)
-		TASK_REGISTRY.add("state_1", 1)
-		self.task_list_cond = [[lambda: READINGS_DICT["CS_M"] == "black" or READINGS_DICT["CS_L"] == "black" or READINGS_DICT["TS_L"] or READINGS_DICT["ULT_B"] < 10], [lambda: self.running_actions_done], [lambda: READINGS_DICT["CS_M"] == "black"]]
-		self.timeout = [30, 180, 60]
-		self.operations = [[lambda: MOTOR.run(forward=True, distance=100, brake=False, speedM=1.3), lambda: self._caction_dec()], [lambda: MOTOR.oddometry_start(), lambda: MOTOR.to_coordinates(0, 20, speed=30), lambda: MOTOR.to_coordinates(10, 20, speed=30), lambda: MOTOR.to_coordinates(10, 20, speed=30), lambda: MOTOR.to_coordinates(31, 41, speed=10), lambda: MOTOR.oddometry_stop()], [lambda: MOTOR.run(forward=True, distance=100, brake=False, speedM=1.3), lambda: self._caction_dec()]]
-
-	def check(self):
-		if TASK_REGISTRY.all_tasks_done():
-			return False
-
-		if self.timer == 0:
-			self.timer = time.time()
-		else:
-			self.timeouted = (time.time() - self.timer) > self.timeout[self.executing_state]
-			if self.timeouted:
-				self.executing_state += 1
-				self.running_actions_done = False
-				self.timer = 0
-				TASK_REGISTRY.set_all("state_" + str(self.executing_state), 1)
-				return True
-
-
-		for i in range(len(self.task_list_cond[self.executing_state])):
-			TASK_REGISTRY.update("state_" + str(self.executing_state), self.task_list_cond[self.executing_state][i](), i)
-		
-		if TASK_REGISTRY.task_done("state_" + str(self.executing_state)):
-			self.executing_state += 1
-			self.running_actions_done = False
-			self.timer = 0
-
-		return not self.fired
-
-	def action(self):
-		if self.timeouted:
-			MOTOR.stop()
-			if DEBUG:
-				timedlog("ma timeouted, at state" + str(self.executing_state))
-			for operation in []:
-				operation()
-			self.timeouted = False
-			return True
-
-		self.supressed = False
-		self.fired = True
-		for operation in self.operations[self.executing_state][self.counter_action:]:
-			operation()
-			while MOTOR.is_running and not self.supressed and not TASK_REGISTRY.task_done("state_" + str(self.executing_state)):
-				pass
-			if not self.supressed:
-				self.counter_action += 1
-		
-		if self.counter_action == len(self.operations[self.executing_state]):
-			self.running_actions_done = True
-			self.counter_action = 0
-
-		self.fired = False
-		return not self.supressed
-
-	def _caction_dec(self):
-		self.counter_action = -1
-
-	def suppress(self):
-		MOTOR.stop()
-		self.supressed = True
-		if DEBUG:
-			timedlog("RunningBhv suppressed")
-
-
-
-
-class mb_controllerBhv(Behavior):
-	def __init__(self):
-		Behavior.__init__(self)
-		self.executing_state = 0
-		self.running_actions_done = False
-		self.fired = False
-		self.timer = 0
-		self.timeouted = False
-		TASK_REGISTRY.add("state_0", 1)
-		self.task_list_cond = [[lambda: self.running_actions_done]]
-		self.timeout = [60]
-		self.operations = [[lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE), lambda: S.speak("Hello World", play_type=S.PLAY_NO_WAIT_FOR_COMPLETE)]]
-
-	def check(self):
-		if TASK_REGISTRY.all_tasks_done():
-			return False
-
-		if self.timer == 0:
-			self.timer = time.time()
-		else:
-			self.timeouted = (time.time() - self.timer) > self.timeout[self.executing_state]
-			if self.timeouted:
-				self.executing_state += 1
-				self.running_actions_done = False
-				self.timer = 0
-				TASK_REGISTRY.set_all("state_" + str(self.executing_state), 1)
-				return True
-
-
-		for i in range(len(self.task_list_cond[self.executing_state])):
-			TASK_REGISTRY.update("state_" + str(self.executing_state), self.task_list_cond[self.executing_state][i](), i)
-		
-		if TASK_REGISTRY.task_done("state_" + str(self.executing_state)):
-			self.executing_state += 1
-			self.running_actions_done = False
-			self.timer = 0
-
-		return not self.fired
-
-	def action(self):
-		if self.timeouted:
-			MOTOR.stop()
-			if DEBUG:
-				timedlog("mb timeouted, at state" + str(self.executing_state))
-			for operation in [lambda: S.beep(), lambda: S.beep()]:
-				operation()
-			self.timeouted = False
-			return True
-
-		self.supressed = False
-		self.fired = True
-		for operation in self.operations[self.executing_state][self.counter_action:]:
-			operation()
-			while MOTOR.is_running and not self.supressed and not TASK_REGISTRY.task_done("state_" + str(self.executing_state)):
-				pass
-			if not self.supressed:
-				self.counter_action += 1
-		
-		if self.counter_action == len(self.operations[self.executing_state]):
-			self.running_actions_done = True
-			self.counter_action = 0
-
-		self.fired = False
-		return not self.supressed
-
-	def _caction_dec(self):
-		self.counter_action = -1
-
-	def suppress(self):
-		MOTOR.stop()
-		self.supressed = True
-		if DEBUG:
-			timedlog("RunningBhv suppressed")
-
-
-
-
-class md_controllerBhv(Behavior):
-	def __init__(self):
-		Behavior.__init__(self)
-		self.executing_state = 0
-		self.running_actions_done = False
-		self.fired = False
-		self.timer = 0
-		self.timeouted = False
-		TASK_REGISTRY.add("state_0", 1)
-		TASK_REGISTRY.add("state_1", 1)
-		self.task_list_cond = [[lambda: READINGS_DICT["CS_M"] == "black"], [lambda: READINGS_DICT["CS_L"] == "black"]]
-		self.timeout = [60, 60]
-		self.operations = [[lambda: MOTOR.run(forward=True, distance=100, brake=False, speedM=1.3), lambda: self._caction_dec()], [lambda: MOTOR.run(forward=True, distance=100, brake=False, speedM=1.3), lambda: self._caction_dec()]]
-
-	def check(self):
-		if TASK_REGISTRY.all_tasks_done():
-			return False
-
-		if self.timer == 0:
-			self.timer = time.time()
-		else:
-			self.timeouted = (time.time() - self.timer) > self.timeout[self.executing_state]
-			if self.timeouted:
-				self.executing_state += 1
-				self.running_actions_done = False
-				self.timer = 0
-				TASK_REGISTRY.set_all("state_" + str(self.executing_state), 1)
-				return True
-
-
-		for i in range(len(self.task_list_cond[self.executing_state])):
-			TASK_REGISTRY.update("state_" + str(self.executing_state), self.task_list_cond[self.executing_state][i](), i)
-		
-		if TASK_REGISTRY.task_done("state_" + str(self.executing_state)):
-			self.executing_state += 1
-			self.running_actions_done = False
-			self.timer = 0
-
-		return not self.fired
-
-	def action(self):
-		if self.timeouted:
-			MOTOR.stop()
-			if DEBUG:
-				timedlog("md timeouted, at state" + str(self.executing_state))
-			for operation in []:
-				operation()
-			self.timeouted = False
-			return True
-
-		self.supressed = False
-		self.fired = True
-		for operation in self.operations[self.executing_state][self.counter_action:]:
-			operation()
-			while MOTOR.is_running and not self.supressed and not TASK_REGISTRY.task_done("state_" + str(self.executing_state)):
-				pass
-			if not self.supressed:
-				self.counter_action += 1
-		
-		if self.counter_action == len(self.operations[self.executing_state]):
-			self.running_actions_done = True
-			self.counter_action = 0
-
-		self.fired = False
-		return not self.supressed
-
-	def _caction_dec(self):
-		self.counter_action = -1
-
-	def suppress(self):
-		MOTOR.stop()
-		self.supressed = True
-		if DEBUG:
-			timedlog("RunningBhv suppressed")
-
-
-
-
-class mf_controllerBhv(Behavior):
-	def __init__(self):
-		Behavior.__init__(self)
-		self.executing_state = 0
-		self.running_actions_done = False
-		self.fired = False
-		self.timer = 0
-		self.timeouted = False
-		TASK_REGISTRY.add("state_0", 1)
-		self.task_list_cond = [[lambda: READINGS_DICT["CS_M"] == "black"]]
-		self.timeout = [60]
+		self.task_list_cond = [[lambda: READINGS_DICT["TS_B"]]]
+		self.timeout = [30]
 		self.operations = [[lambda: MOTOR.run(forward=True, distance=100, brake=False, speedM=1.3), lambda: self._caction_dec()]]
 
 	def check(self):
+		if self.timeouted:
+			return True
 		if TASK_REGISTRY.all_tasks_done():
 			return False
 
@@ -1729,10 +1325,11 @@ class mf_controllerBhv(Behavior):
 		else:
 			self.timeouted = (time.time() - self.timer) > self.timeout[self.executing_state]
 			if self.timeouted:
+				self.suppress()
+				TASK_REGISTRY.set_all("state_" + str(self.executing_state), 1)
 				self.executing_state += 1
 				self.running_actions_done = False
 				self.timer = 0
-				TASK_REGISTRY.set_all("state_" + str(self.executing_state), 1)
 				return True
 
 
@@ -1740,7 +1337,9 @@ class mf_controllerBhv(Behavior):
 			TASK_REGISTRY.update("state_" + str(self.executing_state), self.task_list_cond[self.executing_state][i](), i)
 		
 		if TASK_REGISTRY.task_done("state_" + str(self.executing_state)):
+			self.suppress()
 			self.executing_state += 1
+			self.counter_action = 0
 			self.running_actions_done = False
 			self.timer = 0
 
@@ -1750,34 +1349,118 @@ class mf_controllerBhv(Behavior):
 		if self.timeouted:
 			MOTOR.stop()
 			if DEBUG:
-				timedlog("mf timeouted, at state" + str(self.executing_state))
-			for operation in [lambda: S.beep()]:
+				timedlog("drive_around timeouted, at state" + str(self.executing_state))
+			for operation in [lambda: S.speak("Mission drive_around timeouted")]:
 				operation()
 			self.timeouted = False
 			return True
 
-		self.supressed = False
+		self.suppressed = False
 		self.fired = True
 		for operation in self.operations[self.executing_state][self.counter_action:]:
 			operation()
-			while MOTOR.is_running and not self.supressed and not TASK_REGISTRY.task_done("state_" + str(self.executing_state)):
+			while MOTOR.is_running and not self.suppressed and not TASK_REGISTRY.task_done("state_" + str(self.executing_state)):
 				pass
-			if not self.supressed:
+			if not self.suppressed:
 				self.counter_action += 1
 		
-		if self.counter_action == len(self.operations[self.executing_state]):
+		if not self.suppressed and self.counter_action == len(self.operations[self.executing_state]):
 			self.running_actions_done = True
 			self.counter_action = 0
 
 		self.fired = False
-		return not self.supressed
+		return not self.suppressed
 
 	def _caction_dec(self):
 		self.counter_action = -1
 
 	def suppress(self):
 		MOTOR.stop()
-		self.supressed = True
+		self.suppressed = True
+		if DEBUG:
+			timedlog("RunningBhv suppressed")
+
+
+
+
+class tmp_controllerBhv(Behavior):
+	def __init__(self):
+		Behavior.__init__(self)
+		self.executing_state = 0
+		self.counter_action = 0
+		self.running_actions_done = False
+		self.fired = False
+		self.timer = 0
+		self.timeouted = False
+		TASK_REGISTRY.add("state_0", 1)
+		TASK_REGISTRY.add("state_1", 1)
+		self.task_list_cond = [[lambda: READINGS_DICT["CS_L"] == "yellow"], [lambda: self.running_actions_done]]
+		self.timeout = [300, 60]
+		self.operations = [[lambda: MOTOR.run(forward=True, distance=100, brake=False, speedM=1.3), lambda: self._caction_dec()], [lambda: S.beep(), lambda: S.beep(), lambda: S.beep(), lambda: S.beep(), lambda: S.beep()]]
+
+	def check(self):
+		if self.timeouted:
+			return True
+		if TASK_REGISTRY.all_tasks_done():
+			return False
+
+		if self.timer == 0:
+			self.timer = time.time()
+		else:
+			self.timeouted = (time.time() - self.timer) > self.timeout[self.executing_state]
+			if self.timeouted:
+				self.suppress()
+				TASK_REGISTRY.set_all("state_" + str(self.executing_state), 1)
+				self.executing_state += 1
+				self.running_actions_done = False
+				self.timer = 0
+				return True
+
+
+		for i in range(len(self.task_list_cond[self.executing_state])):
+			TASK_REGISTRY.update("state_" + str(self.executing_state), self.task_list_cond[self.executing_state][i](), i)
+		
+		if TASK_REGISTRY.task_done("state_" + str(self.executing_state)):
+			self.suppress()
+			self.executing_state += 1
+			self.counter_action = 0
+			self.running_actions_done = False
+			self.timer = 0
+
+		return not self.fired
+
+	def action(self):
+		if self.timeouted:
+			MOTOR.stop()
+			if DEBUG:
+				timedlog("tmp timeouted, at state" + str(self.executing_state))
+			for operation in [lambda: S.speak("Mission tmp timeouted")]:
+				operation()
+			self.timeouted = False
+			return True
+
+		self.suppressed = False
+		self.fired = True
+		for operation in self.operations[self.executing_state][self.counter_action:]:
+			operation()
+			while MOTOR.is_running and not self.suppressed and not TASK_REGISTRY.task_done("state_" + str(self.executing_state)):
+				pass
+			if not self.suppressed:
+				self.counter_action += 1
+		
+		if not self.suppressed and self.counter_action == len(self.operations[self.executing_state]):
+			self.running_actions_done = True
+			self.counter_action = 0
+
+		self.fired = False
+		return not self.suppressed
+
+	def _caction_dec(self):
+		self.counter_action = -1
+
+	def suppress(self):
+		MOTOR.stop()
+		self.suppressed = True
 		if DEBUG:
 			timedlog("RunningBhv suppressed")
 
@@ -1792,27 +1475,27 @@ CONTROLLER.add(UpdateReadings())
 CONTROLLER.add(CliffAvoidanceBhv())
 CONTROLLER.add(EdgeAvoidanceBhv())
 CONTROLLER.add(LakeAvoidanceBhv())
-CONTROLLER.add(ba_bhv())
-CONTROLLER.add(bb_bhv())
-CONTROLLER.add(bc_bhv())
-CONTROLLER.add(bd_bhv())
+CONTROLLER.add(notfy_white_right_bhv())
 # CONTROLLER.add(RecoverCollisionBhv(readings_dict, motor))
 # controller.add(AvoidCollisionBhv(readings_dict, motor))
 
-CONTROLLER.add(ma_controllerBhv())
+CONTROLLER.add(tmp_controllerBhv())
 #BLUETOOTH_CONNECTION.start_listening(lambda data: ())
 S.speak('Start') # REMOVE BEFORE DELIVERY
 
-for operation in [lambda: S.speak("Starting mission ma")]:
+for operation in [lambda: S.speak("Starting mission tmp")]:
 	operation()
 
 if DEBUG:
-	timedlog("Starting")
+	timedlog("Starting tmp")
 CONTROLLER.start()
 
 
-for operation in [lambda: S.speak("Mission ma done")]:
+for operation in [lambda: S.speak("Mission tmp done")]:
 	operation()
+
+if DEBUG:
+	timedlog("Done tmp")
 
 
 
@@ -1826,156 +1509,27 @@ CONTROLLER.add(UpdateReadings())
 CONTROLLER.add(CliffAvoidanceBhv())
 CONTROLLER.add(EdgeAvoidanceBhv())
 CONTROLLER.add(LakeAvoidanceBhv())
-CONTROLLER.add(ba_bhv())
-CONTROLLER.add(bb_bhv())
+CONTROLLER.add(notfy_white_right_bhv())
 # CONTROLLER.add(RecoverCollisionBhv(readings_dict, motor))
 # controller.add(AvoidCollisionBhv(readings_dict, motor))
 
-CONTROLLER.add(mb_controllerBhv())
+CONTROLLER.add(drive_around_controllerBhv())
 #BLUETOOTH_CONNECTION.start_listening(lambda data: ())
 S.speak('Start') # REMOVE BEFORE DELIVERY
 
-for operation in [lambda: S.speak("Hello World", play_type=S.PLAY_WAIT_FOR_COMPLETE), lambda: S.beep()]:
+for operation in [lambda: S.speak("Starting mission drive_around")]:
 	operation()
 
 if DEBUG:
-	timedlog("Starting")
+	timedlog("Starting drive_around")
 CONTROLLER.start()
 
 
-for operation in [lambda: S.beep(), lambda: S.beep(), lambda: feedback_leds_blocking(LEDS, "GREEN")]:
-	operation()
-
-
-
-
-
-CONTROLLER = Controller(return_when_no_action=True)
-TASK_REGISTRY = TaskRegistry()
-
-
-CONTROLLER.add(UpdateReadings())
-CONTROLLER.add(CliffAvoidanceBhv())
-CONTROLLER.add(EdgeAvoidanceBhv())
-CONTROLLER.add(LakeAvoidanceBhv())
-CONTROLLER.add(ba_bhv())
-CONTROLLER.add(bb_bhv())
-CONTROLLER.add(bc_bhv())
-CONTROLLER.add(bd_bhv())
-# CONTROLLER.add(RecoverCollisionBhv(readings_dict, motor))
-# controller.add(AvoidCollisionBhv(readings_dict, motor))
-
-CONTROLLER.add(ma_controllerBhv())
-#BLUETOOTH_CONNECTION.start_listening(lambda data: ())
-S.speak('Start') # REMOVE BEFORE DELIVERY
-
-for operation in [lambda: S.speak("Starting mission ma")]:
+for operation in [lambda: S.speak("Mission drive_around done")]:
 	operation()
 
 if DEBUG:
-	timedlog("Starting")
-CONTROLLER.start()
-
-
-for operation in [lambda: S.speak("Mission ma done")]:
-	operation()
-
-
-
-
-
-CONTROLLER = Controller(return_when_no_action=True)
-TASK_REGISTRY = TaskRegistry()
-
-
-CONTROLLER.add(UpdateReadings())
-CONTROLLER.add(CliffAvoidanceBhv())
-CONTROLLER.add(EdgeAvoidanceBhv())
-CONTROLLER.add(LakeAvoidanceBhv())
-CONTROLLER.add(ba_bhv())
-CONTROLLER.add(bb_bhv())
-# CONTROLLER.add(RecoverCollisionBhv(readings_dict, motor))
-# controller.add(AvoidCollisionBhv(readings_dict, motor))
-
-CONTROLLER.add(mb_controllerBhv())
-#BLUETOOTH_CONNECTION.start_listening(lambda data: ())
-S.speak('Start') # REMOVE BEFORE DELIVERY
-
-for operation in [lambda: S.speak("Hello World", play_type=S.PLAY_WAIT_FOR_COMPLETE), lambda: S.beep()]:
-	operation()
-
-if DEBUG:
-	timedlog("Starting")
-CONTROLLER.start()
-
-
-for operation in [lambda: S.beep(), lambda: S.beep(), lambda: feedback_leds_blocking(LEDS, "GREEN")]:
-	operation()
-
-
-
-
-
-CONTROLLER = Controller(return_when_no_action=True)
-TASK_REGISTRY = TaskRegistry()
-
-
-CONTROLLER.add(UpdateReadings())
-CONTROLLER.add(CliffAvoidanceBhv())
-CONTROLLER.add(EdgeAvoidanceBhv())
-CONTROLLER.add(LakeAvoidanceBhv())
-CONTROLLER.add(ba_bhv())
-CONTROLLER.add(bb_bhv())
-CONTROLLER.add(bd_bhv())
-CONTROLLER.add(bc_bhv())
-# CONTROLLER.add(RecoverCollisionBhv(readings_dict, motor))
-# controller.add(AvoidCollisionBhv(readings_dict, motor))
-
-CONTROLLER.add(md_controllerBhv())
-#BLUETOOTH_CONNECTION.start_listening(lambda data: ())
-S.speak('Start') # REMOVE BEFORE DELIVERY
-
-for operation in [lambda: S.speak("Starting mission md")]:
-	operation()
-
-if DEBUG:
-	timedlog("Starting")
-CONTROLLER.start()
-
-
-for operation in [lambda: S.speak("Mission md done")]:
-	operation()
-
-
-
-
-
-CONTROLLER = Controller(return_when_no_action=True)
-TASK_REGISTRY = TaskRegistry()
-
-
-CONTROLLER.add(UpdateReadings())
-CONTROLLER.add(CliffAvoidanceBhv())
-CONTROLLER.add(EdgeAvoidanceBhv())
-CONTROLLER.add(LakeAvoidanceBhv())
-CONTROLLER.add(ba_bhv())
-# CONTROLLER.add(RecoverCollisionBhv(readings_dict, motor))
-# controller.add(AvoidCollisionBhv(readings_dict, motor))
-
-CONTROLLER.add(mf_controllerBhv())
-#BLUETOOTH_CONNECTION.start_listening(lambda data: ())
-S.speak('Start') # REMOVE BEFORE DELIVERY
-
-for operation in [lambda: S.beep()]:
-	operation()
-
-if DEBUG:
-	timedlog("Starting")
-CONTROLLER.start()
-
-
-for operation in [lambda: S.speak("Mission mf done")]:
-	operation()
+	timedlog("Done drive_around")
 
 
 
