@@ -15,7 +15,7 @@ LEFT, RIGHT = -1, 1
 BLACK = 1
 
 def int2color(colornr):
-    color_dict = {0: "nocolor", 1: "black", 2: "blue", 3: "green", 4: "yellow", 5: "red", 6: "white", 7: "brown"}
+    color_dict = {0: "nocolor", 1: "black", 2: "blue", 3: "green", 4: "yellow", 5: "red", 6: "white", 7: "yellow"} # 7 should be brown
     return color_dict[colornr]
 
 
@@ -172,6 +172,9 @@ class TaskRegistry():
 
     def set(self, task_name, value, trigger_index=0):
         self.tasks[task_name][trigger_index] = value
+    
+    def set_all(self, task_name, value):
+        self.tasks[task_name] = [value] * len(self.tasks[task_name])
 
     def update(self, task_name, value, trigger_index=0):
         self.tasks[task_name][trigger_index] = max(self.tasks[task_name][trigger_index], value)
@@ -294,6 +297,14 @@ class BluetoothConnection():
         self.client_sock.close()
         if self.is_master:
             self.server_sock.close()
+
+
+def set_color_ranges(color_dict, ranges, color_name):
+    for r_range, g_range, b_range in ranges:
+        for red in range(r_range[0], r_range[1] + 1):
+            for green in range(g_range[0], g_range[1] + 1):
+                for blue in range(b_range[0], b_range[1] + 1):
+                    color_dict[(red, green, blue)] = color_name
 
 
 def read_color_sensor(cs):  

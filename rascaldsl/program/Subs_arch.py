@@ -104,7 +104,7 @@ class Controller():
 
     def _find_and_set_new_active_behavior(self):
         new_behavior_priority = self.find_next_active_behavior()
-        if self.active_behavior_index is None or self.active_behavior_index > new_behavior_priority:
+        if self.active_behavior_index is None or (new_behavior_priority is not None and self.active_behavior_index > new_behavior_priority):
             if self.active_behavior_index is not None:
                 self.behaviors[self.active_behavior_index].suppress()
             self.active_behavior_index = new_behavior_priority

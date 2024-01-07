@@ -1,6 +1,4 @@
-    rVal += "#!/usr/bin/env python3
-
-# -*- coding: utf-8 -*-
+    rVal += "# -*- coding: utf-8 -*-
 import threading
 
 
@@ -106,7 +104,7 @@ class Controller():
 
     def _find_and_set_new_active_behavior(self):
         new_behavior_priority = self.find_next_active_behavior()
-        if self.active_behavior_index is None or self.active_behavior_index \> new_behavior_priority:
+        if self.active_behavior_index is None or (new_behavior_priority is not None and self.active_behavior_index \> new_behavior_priority):
             if self.active_behavior_index is not None:
                 self.behaviors[self.active_behavior_index].suppress()
             self.active_behavior_index = new_behavior_priority
@@ -160,9 +158,6 @@ class Controller():
     def __str__(self):
         return str(self.behaviors)
 
-DEBUG = False
-
-
 #!/usr/bin/env python3
 
 DEBUG = True
@@ -180,7 +175,7 @@ LEFT, RIGHT = -1, 1
 BLACK = 1
 
 def int2color(colornr):
-    color_dict = {0: \"nocolor\", 1: \"black\", 2: \"blue\", 3: \"green\", 4: \"yellow\", 5: \"red\", 6: \"white\", 7: \"brown\"}
+    color_dict = {0: \"nocolor\", 1: \"black\", 2: \"blue\", 3: \"green\", 4: \"yellow\", 5: \"red\", 6: \"white\", 7: \"yellow\"} # 7 should be brown
     return color_dict[colornr]
 
 
@@ -337,6 +332,9 @@ class TaskRegistry():
 
     def set(self, task_name, value, trigger_index=0):
         self.tasks[task_name][trigger_index] = value
+    
+    def set_all(self, task_name, value):
+        self.tasks[task_name] = [value] * len(self.tasks[task_name])
 
     def update(self, task_name, value, trigger_index=0):
         self.tasks[task_name][trigger_index] = max(self.tasks[task_name][trigger_index], value)
@@ -461,6 +459,14 @@ class BluetoothConnection():
             self.server_sock.close()
 
 
+def set_color_ranges(color_dict, ranges, color_name):
+    for r_range, g_range, b_range in ranges:
+        for red in range(r_range[0], r_range[1] + 1):
+            for green in range(g_range[0], g_range[1] + 1):
+                for blue in range(b_range[0], b_range[1] + 1):
+                    color_dict[(red, green, blue)] = color_name
+
+
 def read_color_sensor(cs):  
     \"\"\"
     Reads the color sensor and returns the color that was read.
@@ -513,7 +519,6 @@ def read_touch_sensor(touch_sensor):
         return touch
 
 
-
 import random
 
 from ev3dev2.motor import MoveDifferential, MediumMotor, OUTPUT_A, OUTPUT_B, OUTPUT_C
@@ -545,7 +550,7 @@ class RunningBhv(Behavior):
 
     def __init__(self):
         Behavior.__init__(self)
-        self.supressed = False
+        self.suppressed = False
 
     def check(self):
 
@@ -556,22 +561,22 @@ class RunningBhv(Behavior):
         Keep the robot moving
         \"\"\"
 
-        self.supressed = False
+        self.suppressed = False
         if DEBUG:
             timedlog(\"Moving\")
         
-        # while not self.supressed:
+        # while not self.suppressed:
         #     MOTOR.run(forward=True, distance=10, brake=False)
-        #     while MOTOR.is_running and not self.supressed:
+        #     while MOTOR.is_running and not self.suppressed:
         #         pass
-        #     if not self.supressed:
+        #     if not self.suppressed:
         #         MOTOR.apply_momentum()
 
         MOTOR.run(forward=True, distance=1000, brake=False, speedM=1.3)
-        while MOTOR.is_running and not self.supressed:
+        while MOTOR.is_running and not self.suppressed:
             pass
 
-        return not self.supressed
+        return not self.suppressed
 
 
     def suppress(self):
@@ -579,7 +584,7 @@ class RunningBhv(Behavior):
         Suppress the behavior
         \"\"\"
         MOTOR.stop()
-        self.supressed = True
+        self.suppressed = True
         if DEBUG:
             timedlog(\"Moving suppressed\")
 
@@ -591,7 +596,7 @@ class CliffAvoidanceBhv(Behavior):
 
     def __init__(self, heigth_treshold_min=120, heigth_treshold_max=400):
         Behavior.__init__(self)
-        self.supressed = False
+        self.suppressed = False
         self.heigth_treshold_min = heigth_treshold_min
         self.heigth_treshold_max = heigth_treshold_max   
 
@@ -636,21 +641,21 @@ class CliffAvoidanceBhv(Behavior):
         \"\"\"
 
         self.fire = True
-        self.supressed = False
+        self.suppressed = False
         if DEBUG:
             timedlog(\"Cliff avoidance \" + str(self.back_cliff))
 
         for operation in self.operations:
             operation()
-            while MOTOR.is_running and not self.supressed:
+            while MOTOR.is_running and not self.suppressed:
                 pass
-            if self.supressed:
+            if self.suppressed:
                 break
         
         self._reset()
-        if DEBUG and not self.supressed:
+        if DEBUG and not self.suppressed:
             timedlog(\"Cliff avoidance done\")
-        return not self.supressed
+        return not self.suppressed
 
 
     def suppress(self):
@@ -658,7 +663,7 @@ class CliffAvoidanceBhv(Behavior):
         Suppress the behavior
         \"\"\"
         MOTOR.stop()
-        self.supressed = True
+        self.suppressed = True
         if DEBUG:
             timedlog(\"Cliff avoidance suppressed\")
 
@@ -675,7 +680,7 @@ class EdgeAvoidanceBhv(Behavior):
  
         \"\"\"
         Behavior.__init__(self)
-        self.supressed = False
+        self.suppressed = False
 
         self.edge = {\"left\": False, \"mid\": False, \"right\": False}
         self.left_c, self.mid_c, self.right_c = \"black\", \"black\", \"black\"
@@ -751,21 +756,21 @@ class EdgeAvoidanceBhv(Behavior):
         \"\"\"
         Change direction to step away from the border
         \"\"\"
-        self.supressed = False
+        self.suppressed = False
         if DEBUG:
             timedlog(\"Edge collision \" + str(self.edge))
         avoid_stuck = [lambda: MOTOR.run(forward=False, distance=10), lambda: MOTOR.turn(degrees=5)] if random.random() \< 0.1 else []
         for operation in avoid_stuck + self.operations:
             operation()
-            while MOTOR.is_running and not self.supressed:
+            while MOTOR.is_running and not self.suppressed:
                 pass
-            if self.supressed:
+            if self.suppressed:
                 break
         
         self._reset()
-        if DEBUG and not self.supressed:
+        if DEBUG and not self.suppressed:
             timedlog(\"Edge collision done\")
-        return not self.supressed
+        return not self.suppressed
 
 
 
@@ -774,7 +779,7 @@ class EdgeAvoidanceBhv(Behavior):
         Suppress the behavior
         \"\"\"
         MOTOR.stop()
-        self.supressed = True
+        self.suppressed = True
         if DEBUG:
             timedlog(\"Edge collision suppressed\")
 
@@ -796,7 +801,7 @@ class LakeAvoidanceBhv(Behavior):
  
         \"\"\"
         Behavior.__init__(self)
-        self.supressed = False
+        self.suppressed = False
         # self.measure = measure
         # self.last_color = None
 
@@ -920,25 +925,25 @@ class LakeAvoidanceBhv(Behavior):
         Change direction to step away from the border
         \"\"\"
 
-        self.supressed = False
+        self.suppressed = False
         if DEBUG:
             timedlog(\"Lake collision  \" + str(self.edge))
 
         avoid_stuck = [lambda: MOTOR.run(forward=False, distance=10), lambda: MOTOR.turn(degrees=5)] if random.random() \< 0.1 else []
         for operation in avoid_stuck + self.operations:
             operation()
-            while MOTOR.is_running and not self.supressed:
+            while MOTOR.is_running and not self.suppressed:
                 pass
             # if self.last_color is not None:
             #     self.detected_colors[self.last_color] = True
             #     self.last_color = None
-            if self.supressed:
+            if self.suppressed:
                 break
         
         self._reset()
-        if DEBUG and not self.supressed:
+        if DEBUG and not self.suppressed:
             timedlog(\"Lake collision done\")
-        return not self.supressed
+        return not self.suppressed
 
 
     def suppress(self):
@@ -946,7 +951,7 @@ class LakeAvoidanceBhv(Behavior):
         Suppress the behavior
         \"\"\"
         MOTOR.stop()
-        self.supressed = True
+        self.suppressed = True
         if DEBUG:
             timedlog(\"Lake collision suppressed\")
 
@@ -1051,6 +1056,7 @@ class UpdateReadings(Behavior):
         READINGS_DICT[\"CS_R\"] = read_color_sensor(CS_R)
         READINGS_DICT[\"US_B\"] = read_ultrasonic_sensor(US_B)
         
+        timedlog(\"Readings: \" + str(READINGS_DICT))
         # log = \"Readings: \" + str(READINGS_DICT[\'touch_left\']) + \",\" + str(READINGS_DICT[\'touch_right\']) + \",\" + str(READINGS_DICT[\'touch_back\']) + \",\" + str(READINGS_DICT[\'ult_front\'])
         # timedlog(log)
             
@@ -1086,7 +1092,7 @@ class AvoidCollisionBhv(Behavior):
 
         \"\"\"
         Behavior.__init__(self)
-        self.supressed = False
+        self.suppressed = False
         self.threshold_distance = threshold_distance        
         self.obj_front = False
         self.operations = []
@@ -1129,9 +1135,9 @@ class AvoidCollisionBhv(Behavior):
         
         for operation in self.operations:
             operation()
-            while MOTOR.is_running and not self.supressed:
+            while MOTOR.is_running and not self.suppressed:
                 pass
-            if self.supressed:
+            if self.suppressed:
                 break
         
         self._reset()
@@ -1157,7 +1163,7 @@ class RecoverCollisionBhv(Behavior):
     def __init__(self):
 
         Behavior.__init__(self)
-        self.supressed = False
+        self.suppressed = False
         self.operations = []
         self.obj_left = False
         self.obj_right = False
@@ -1217,9 +1223,9 @@ class RecoverCollisionBhv(Behavior):
         
         for operation in self.operations:
             operation()
-            while MOTOR.is_running and not self.supressed:
+            while MOTOR.is_running and not self.suppressed:
                 pass
-            if self.supressed:
+            if self.suppressed:
                 break
          
         self._reset()
@@ -1233,48 +1239,4 @@ class RecoverCollisionBhv(Behavior):
         self.suppressed = True
         if DEBUG:
             timedlog(\"Collision recover suppressed\")
-
-
-CONTROLLER = Controller(return_when_no_action=True)
-
-
-master_mac = \'00:17:E9:B4:CE:E6\'
-master = True
-
-# bluetooth_connection = BluetoothConnection(master, master_mac, debug=DEBUG)
-
-
-# task_registry = TaskRegistry()
-
-S.speak(\'Start\')
-if DEBUG:
-    timedlog(\"Starting\")
-
-
-
-
-
-##### GENERATED CODE GOES HERE #####
-##### GENERATED CODE GOES HERE #####
-##### GENERATED CODE GOES HERE #####
-
-# controller.add(UpdateSlaveReadings(bluetooth_connection, readings_dict))
-CONTROLLER.add(UpdateReadings())
-CONTROLLER.add(CliffAvoidanceBhv())
-CONTROLLER.add(EdgeAvoidanceBhv())
-CONTROLLER.add(LakeAvoidanceBhv())
-# CONTROLLER.add(RecoverCollisionBhv(readings_dict, motor))
-# controller.add(AvoidCollisionBhv(readings_dict, motor))
-CONTROLLER.add(RunningBhv())
-
-
-##### GENERATED CODE GOES HERE #####
-##### GENERATED CODE GOES HERE #####
-##### GENERATED CODE GOES HERE #####
-
-
-# bluetooth_connection.start_listening(lambda data: ())
-CONTROLLER.start()
-
-S.speak(\"stop\")
             '";

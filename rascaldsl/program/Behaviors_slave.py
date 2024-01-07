@@ -99,7 +99,7 @@ class UpdateSlaveReadingsBhv(Behavior):
 
 #         """
 #         Behavior.__init__(self)
-#         self.supressed = False
+#         self.suppressed = False
 #         self.touch_sensor_left = touch_sensor_left
 #         self.touch_sensor_right = touch_sensor_right
 #         self.motor = motor
@@ -147,8 +147,8 @@ class UpdateSlaveReadingsBhv(Behavior):
 #         Change direction to step away from the object
 #         """
 
-#         self.supressed = False
-#         stop_conditions = {"suppressed": self.supressed}
+#         self.suppressed = False
+#         stop_conditions = {"suppressed": self.suppressed}
 #         timedlog("Collision")
 #         if self.leds:
 #             set_leds_color(self.leds, "RED")
@@ -162,10 +162,10 @@ class UpdateSlaveReadingsBhv(Behavior):
 #         else:
 #             self.motor.change_direction(stop_conditions, direction=LEFT, steer_degrees=120)
 
-#         while self.motor.is_running and not self.supressed:
+#         while self.motor.is_running and not self.suppressed:
 #             pass
 
-#         if not self.supressed:
+#         if not self.suppressed:
 #             return True
 #         else:
 #             timedlog("Collision suppressed")
@@ -177,7 +177,7 @@ class UpdateSlaveReadingsBhv(Behavior):
 #         Suppress the behavior
 #         """
 #         self.motor.stop()
-#         self.supressed = True
+#         self.suppressed = True
 
 
 # class DetectObjectSensorBhv(Behavior):
@@ -195,7 +195,7 @@ class UpdateSlaveReadingsBhv(Behavior):
 
 #         """
 #         Behavior.__init__(self)
-#         self.supressed = False
+#         self.suppressed = False
 #         ultrasonic_sensor.mode = 'US-DIST-CM'
 #         self.ultrasonic_sensor = ultrasonic_sensor
 #         self.motor = motor
@@ -224,8 +224,8 @@ class UpdateSlaveReadingsBhv(Behavior):
 #         Change direction to step away from the object
 #         """
 
-#         self.supressed = False
-#         stop_conditions = {"suppressed": self.supressed}
+#         self.suppressed = False
+#         stop_conditions = {"suppressed": self.suppressed}
 
 #         timedlog("Avoiding collision")
 #         if self.leds:
@@ -235,10 +235,10 @@ class UpdateSlaveReadingsBhv(Behavior):
 
 #         self.motor.change_direction(stop_conditions, steer_degrees=90, back_rotations=0.3)
 
-#         while self.motor.is_running and not self.supressed:
+#         while self.motor.is_running and not self.suppressed:
 #             pass
 
-#         if not self.supressed:
+#         if not self.suppressed:
 #             return True
 #         else:
 #             timedlog("Avoiding collision suppressed")
@@ -250,7 +250,7 @@ class UpdateSlaveReadingsBhv(Behavior):
 #         Suppress the behavior
 #         """
 #         self.motor.stop()
-#         self.supressed = True
+#         self.suppressed = True
 
 
 # class DetectColorBhv(Behavior):
