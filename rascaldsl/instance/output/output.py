@@ -268,7 +268,7 @@ class Motor():
     def to_coordinates(self, x, y, speed=None, speedM=0.5, block=False, brake=False):
         if speed is None:
             speed = self.base_speed * speedM
-        self.motor.to_coordinates(x, y, SpeedPercent(speed), block=block, brake=brake)
+        self.motor.on_to_coordinates(SpeedPercent(speed), x, y, block=block, brake=brake)
 
     # def log_reset(self):
     #     self.log_distance = 0
@@ -1244,7 +1244,7 @@ class RecoverCollisionBhv(Behavior):
 
 
 
-class notfy_white_right_bhv(Behavior):
+class notify_yellow_lake_bhv(Behavior):
 	def __init__(self):
 		Behavior.__init__(self)
 		self.suppressed = False
@@ -1262,10 +1262,10 @@ class notfy_white_right_bhv(Behavior):
 
 	def check(self):
 		if not self.to_fire and not self.firing:
-			self.to_fire = (READINGS_DICT["CS_R"] == "white")
+			self.to_fire = (READINGS_DICT["CS_L"] == "yellow" and READINGS_DICT["CS_M"] == "yellow" and READINGS_DICT["CS_R"] == "yellow")
 		
 			if self.to_fire:
-				self.operations = [lambda: S.beep(), lambda: S.beep(), lambda: S.beep()]
+				self.operations = [lambda: S.beep()]
 		return self.to_fire and not self.firing
 
 
@@ -1275,7 +1275,7 @@ class notfy_white_right_bhv(Behavior):
 		self.firing = True
 		self.to_fire = False
 		if DEBUG:
-			timedlog("notfy_white_right fired")
+			timedlog("notify_yellow_lake fired")
 
 		for operation in self.operations:
 			operation()
@@ -1287,7 +1287,7 @@ class notfy_white_right_bhv(Behavior):
 		self._reset()
 
 		if DEBUG and not self.suppressed:
-			timedlog("notfy_white_right done")
+			timedlog("notify_yellow_lake done")
 		return not self.suppressed
 
 
@@ -1295,90 +1295,7 @@ class notfy_white_right_bhv(Behavior):
 		MOTOR.stop()
 		self.suppressed = True
 		if DEBUG:
-			timedlog("notfy_white_right suppressed")
-
-
-
-
-class drive_around_controllerBhv(Behavior):
-	def __init__(self):
-		Behavior.__init__(self)
-		self.executing_state = 0
-		self.counter_action = 0
-		self.running_actions_done = False
-		self.fired = False
-		self.timer = 0
-		self.timeouted = False
-		TASK_REGISTRY.add("state_0", 1)
-		self.task_list_cond = [[lambda: READINGS_DICT["TS_B"]]]
-		self.timeout = [30]
-		self.operations = [[lambda: MOTOR.run(forward=True, distance=100, brake=False, speedM=1.3), lambda: self._caction_dec()]]
-
-	def check(self):
-		if self.timeouted:
-			return True
-		if TASK_REGISTRY.all_tasks_done():
-			return False
-
-		if self.timer == 0:
-			self.timer = time.time()
-		else:
-			self.timeouted = (time.time() - self.timer) > self.timeout[self.executing_state]
-			if self.timeouted:
-				self.suppress()
-				TASK_REGISTRY.set_all("state_" + str(self.executing_state), 1)
-				self.executing_state += 1
-				self.running_actions_done = False
-				self.timer = 0
-				return True
-
-
-		for i in range(len(self.task_list_cond[self.executing_state])):
-			TASK_REGISTRY.update("state_" + str(self.executing_state), self.task_list_cond[self.executing_state][i](), i)
-		
-		if TASK_REGISTRY.task_done("state_" + str(self.executing_state)):
-			self.suppress()
-			self.executing_state += 1
-			self.counter_action = 0
-			self.running_actions_done = False
-			self.timer = 0
-
-		return not self.fired
-
-	def action(self):
-		if self.timeouted:
-			MOTOR.stop()
-			if DEBUG:
-				timedlog("drive_around timeouted, at state" + str(self.executing_state))
-			for operation in [lambda: S.speak("Mission drive_around timeouted")]:
-				operation()
-			self.timeouted = False
-			return True
-
-		self.suppressed = False
-		self.fired = True
-		for operation in self.operations[self.executing_state][self.counter_action:]:
-			operation()
-			while MOTOR.is_running and not self.suppressed and not TASK_REGISTRY.task_done("state_" + str(self.executing_state)):
-				pass
-			if not self.suppressed:
-				self.counter_action += 1
-		
-		if not self.suppressed and self.counter_action == len(self.operations[self.executing_state]):
-			self.running_actions_done = True
-			self.counter_action = 0
-
-		self.fired = False
-		return not self.suppressed
-
-	def _caction_dec(self):
-		self.counter_action = -1
-
-	def suppress(self):
-		MOTOR.stop()
-		self.suppressed = True
-		if DEBUG:
-			timedlog("RunningBhv suppressed")
+			timedlog("notify_yellow_lake suppressed")
 
 
 
@@ -1393,10 +1310,9 @@ class tmp_controllerBhv(Behavior):
 		self.timer = 0
 		self.timeouted = False
 		TASK_REGISTRY.add("state_0", 1)
-		TASK_REGISTRY.add("state_1", 1)
-		self.task_list_cond = [[lambda: READINGS_DICT["CS_L"] == "yellow"], [lambda: self.running_actions_done]]
-		self.timeout = [300, 60]
-		self.operations = [[lambda: MOTOR.run(forward=True, distance=100, brake=False, speedM=1.3), lambda: self._caction_dec()], [lambda: S.beep(), lambda: S.beep(), lambda: S.beep(), lambda: S.beep(), lambda: S.beep()]]
+		self.task_list_cond = [[lambda: self.running_actions_done]]
+		self.timeout = [60]
+		self.operations = [[lambda: MOTOR.odometry_start(), lambda: MOTOR.to_coordinates(0, 70, speed=15), lambda: MOTOR.odometry_stop()]]
 
 	def check(self):
 		if self.timeouted:
@@ -1433,8 +1349,8 @@ class tmp_controllerBhv(Behavior):
 		if self.timeouted:
 			MOTOR.stop()
 			if DEBUG:
-				timedlog("tmp timeouted, at state" + str(self.executing_state))
-			for operation in [lambda: S.speak("Mission tmp timeouted")]:
+				timedlog("tmp timeouted, at state" + str(self.executing_state - 1))
+			for operation in [lambda: S.speak("Timeout", play_type=S.PLAY_WAIT_FOR_COMPLETE), lambda: S.speak("Timeout", play_type=S.PLAY_WAIT_FOR_COMPLETE), lambda: S.speak("Timeout", play_type=S.PLAY_WAIT_FOR_COMPLETE)]:
 				operation()
 			self.timeouted = False
 			return True
@@ -1471,65 +1387,43 @@ CONTROLLER = Controller(return_when_no_action=True)
 TASK_REGISTRY = TaskRegistry()
 
 
-CONTROLLER.add(UpdateReadings())
-CONTROLLER.add(CliffAvoidanceBhv())
-CONTROLLER.add(EdgeAvoidanceBhv())
-CONTROLLER.add(LakeAvoidanceBhv())
-CONTROLLER.add(notfy_white_right_bhv())
-# CONTROLLER.add(RecoverCollisionBhv(readings_dict, motor))
-# controller.add(AvoidCollisionBhv(readings_dict, motor))
+# CONTROLLER.add(UpdateReadings())
+# CONTROLLER.add(CliffAvoidanceBhv())
+# CONTROLLER.add(EdgeAvoidanceBhv())
+# CONTROLLER.add(LakeAvoidanceBhv())
+# CONTROLLER.add(notify_yellow_lake_bhv())
+# # CONTROLLER.add(RecoverCollisionBhv(readings_dict, motor))
+# # controller.add(AvoidCollisionBhv(readings_dict, motor))
 
-CONTROLLER.add(tmp_controllerBhv())
-#BLUETOOTH_CONNECTION.start_listening(lambda data: ())
-S.speak('Start') # REMOVE BEFORE DELIVERY
+# CONTROLLER.add(tmp_controllerBhv())
+# #BLUETOOTH_CONNECTION.start_listening(lambda data: ())
+# S.speak('Start') # REMOVE BEFORE DELIVERY
 
-for operation in [lambda: S.speak("Starting mission tmp")]:
-	operation()
+# for operation in [lambda: S.speak("Starting mission tmp")]:
+# 	operation()
 
-if DEBUG:
-	timedlog("Starting tmp")
-CONTROLLER.start()
+# if DEBUG:
+# 	timedlog("Starting tmp")
+# CONTROLLER.start()
 
 
-for operation in [lambda: S.speak("Mission tmp done")]:
+
+MOTOR.odometry_start()
+MOTOR.to_coordinates(0, 30, speed=15)
+
+
+while MOTOR.is_running:
+    pass
+MOTOR.odometry_stop()
+
+
+S.speak('Done') # REMOVE BEFORE DELIVERY
+
+for operation in [lambda: S.speak("Lake surpassed mission", play_type=S.PLAY_WAIT_FOR_COMPLETE)]:
 	operation()
 
 if DEBUG:
 	timedlog("Done tmp")
-
-
-
-
-
-CONTROLLER = Controller(return_when_no_action=True)
-TASK_REGISTRY = TaskRegistry()
-
-
-CONTROLLER.add(UpdateReadings())
-CONTROLLER.add(CliffAvoidanceBhv())
-CONTROLLER.add(EdgeAvoidanceBhv())
-CONTROLLER.add(LakeAvoidanceBhv())
-CONTROLLER.add(notfy_white_right_bhv())
-# CONTROLLER.add(RecoverCollisionBhv(readings_dict, motor))
-# controller.add(AvoidCollisionBhv(readings_dict, motor))
-
-CONTROLLER.add(drive_around_controllerBhv())
-#BLUETOOTH_CONNECTION.start_listening(lambda data: ())
-S.speak('Start') # REMOVE BEFORE DELIVERY
-
-for operation in [lambda: S.speak("Starting mission drive_around")]:
-	operation()
-
-if DEBUG:
-	timedlog("Starting drive_around")
-CONTROLLER.start()
-
-
-for operation in [lambda: S.speak("Mission drive_around done")]:
-	operation()
-
-if DEBUG:
-	timedlog("Done drive_around")
 
 
 

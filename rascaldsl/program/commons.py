@@ -107,7 +107,7 @@ class Motor():
     def to_coordinates(self, x, y, speed=None, speedM=0.5, block=False, brake=False):
         if speed is None:
             speed = self.base_speed * speedM
-        self.motor.to_coordinates(x, y, SpeedPercent(speed), block=block, brake=brake)
+        self.motor.on_to_coordinates(SpeedPercent(speed), x, y, block=block, brake=brake)
 
     # def log_reset(self):
     #     self.log_distance = 0

@@ -1,0 +1,24 @@
+black_mid == COLOR mid black
+yellow_left == COLOR left yellow
+yellow_right == COLOR right yellow
+yellow_mid == COLOR mid yellow
+white_right == COLOR right white
+
+touch_back == TOUCH back
+
+notify := BEEP
+turn_360 := RIGHT 360° 15
+drive_over := FORWARD 70cm 15
+
+Behavior: notfy_white_right WHEN white_right DO notify^3
+Behavior: notify_yellow_lake WHEN [yellow_left, yellow_right, yellow_mid] DO notify
+
+
+border_lake_speech := SPEAK "Starting border lake mission"
+over_lake_speech := SPEAK "Lake surpassed mission"
+timeout := SPEAK "Timeout"
+
+Mission: tmp EXECUTE drive_over WHILE notify_yellow_lake FEEDBACKS: {START, END [over_lake_speech], TIMEOUT timeout^3}
+
+
+Rover: [tmp] MAC: "00:17:E9:B4:CE:E6"

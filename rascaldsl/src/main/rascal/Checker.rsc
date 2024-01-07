@@ -216,7 +216,6 @@ void collect(current: (Trigger) `<ID idNew> <TriggerAssignment triggerAssignment
           c.define("<idNew>", triggerId(), idNew, dt);
      }
      else if(/(DistanceTrigger)`INDISTANCE <DistanceSensor distanceSensor> <Distance distance>` := roverTrigger) {
-          if ("<distanceSensor>" == "back") c.report(info(current, "back sensor as a solo trigger for a Bhv is useless, since that behavior will always be preempted by a safety bhv"));
           dt = defType(distanceTriggerType());
           dt.distanceTrigger = [distanceTrigger(sensor="<distanceSensor>", distance=computeDistance(distance))];
           c.define("<idNew>", triggerId(), idNew, dt);
