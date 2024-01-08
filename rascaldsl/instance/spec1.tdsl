@@ -12,7 +12,7 @@ ab := RIGHT 90° 30
 abb := LEFT 45° 30
 aaa := FORWARD 30 10
 ac := BEEP
-af := MEASURE 10h
+af := MEASURE LAKE red 10h
 acc := SPEAK "Hello World"
 accc := acc^30
 acd := LED green
@@ -26,7 +26,7 @@ Behavior: bd WHEN [ta, td] DO [ad, aa, af, ad]
 
 
 
-Mission: ma EXECUTE [{ANY [td, te] 30s}, [aa, aa, ab, aa, abb, aaa] 180s, {ta}] WHILE ba + bb + bc + bd 
+Mission: ma EXECUTE [af, {ANY [td, te] 30s}, [aa, aa, ab, aa, abb, aaa] 180s, {ta}] WHILE ba + bb + bc + bd 
 Mission: mb EXECUTE accc WHILE [ba, bb] FEEDBACKS: {START[acc, ac], END [ac, ac, acd], TIMEOUT [ac, ac]} 
 Mission: mc EXECUTE [{[ta, tb]}, {tc}] WHILE ba
 Mission: md EXECUTE [{ta}, {tb}] WHILE [ba, bb, bd, bc]

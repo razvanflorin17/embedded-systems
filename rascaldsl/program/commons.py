@@ -54,7 +54,7 @@ class ArmMotor():
     @property
     def is_running(self):
         return self.motor.is_running
-
+    
 
 class Motor():
     """
@@ -104,10 +104,19 @@ class Motor():
     def odometry_stop(self):
         self.motor.odometry_stop()
     
-    def to_coordinates(self, x, y, speed=None, speedM=0.5, block=False, brake=False):
+    def to_coordinates(self, x, y, speed=None, speedM=0.5, block=False, brake=False, random_rep=False, bhv=None):
         if speed is None:
             speed = self.base_speed * speedM
-        self.motor.on_to_coordinates(SpeedPercent(speed), x, y, block=block, brake=brake)
+        
+        if random_rep and bhv is not None and  random.random() < 0.2:
+            self.turn(degress=40, speed=speed, speedM=speedM, block=block, brake=brake)
+            while self.is_running and not bhv.suppressed:
+                pass
+
+            if not bhv.suppressed:
+                self.motor.on_to_coordinates(SpeedPercent(speed), x*10, y*10, block=block, brake=brake) # x and y are in mm
+        else:
+            self.motor.on_to_coordinates(SpeedPercent(speed), x*10, y*10, block=block, brake=brake) # x and y are in mm
 
     # def log_reset(self):
     #     self.log_distance = 0

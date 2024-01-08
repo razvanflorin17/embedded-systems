@@ -50,7 +50,7 @@ data MoveAction = moveAction(str direction = "", int distance = 0, int speed = 1
 data TurnAction = turnAction(str direction = "", int angle = 0, int speed = 10);
 data SpeakAction = speakAction(str text = "");
 data LedAction = ledAction(str color = "");
-data MeasureAction = measureAction(int time=1);
+data MeasureAction = measureAction(int time=1, str target = "");
 
 data Behavior = behavior(list[loc] triggerList = [], list[loc] actionList = [], str triggerListMod="ALL");
 data Task = task(list[loc] activityList = [], str activityType="TRIGGER", str activityListMod="ALL", int timeout=60);
@@ -288,11 +288,8 @@ void collect(current:(Action)`<ID idNew> <ActionAssignment actionAssignment> <Ro
           dt.ledAction = [ledAction(color="<color>")];
           c.define("<idNew>", actionId(), idNew, dt);
      }
-     else if(/(MeasureAction) `MEASURE <Time? time>` := roverAction) {
-          dt = defType(measureActionType());
-          time_value = 1;
-          if(/(MeasureAction) `MEASURE <Time time>` := roverAction) time_value = computeTime(time);
-          dt.measureAction = [measureAction(time=time_value)];
+     else if(/(MeasureAction) `<MeasureAction measureAction>` := roverAction) {
+          dt = createMeasureAction(measureAction, c);
           c.define("<idNew>", actionId(), idNew, dt);
      }
 
@@ -340,6 +337,21 @@ DefInfo createTurnAction(action, Collector c) {
           dt.turnAction = [turnAction(direction="none", angle=toInt(replaceLast("<angle>", "°", "")), speed=speed_value)];
      }
      
+     return dt;
+}
+
+
+DefInfo createMeasureAction(action, Collector c) {
+     dt = defType(measureActionType());
+     time_value = 1;
+     if (/(Time) `<Time time>` := action) time_value = computeTime(time);
+     if (/(MeasureAction)`MEASURE LAKE <ColorReadable color> <Time? _>` := action) {
+          if ("<color>" == "white" || "<color>" == "black") c.report(error(color, "<color> is not a valid color for lake"));
+          dt.measureAction = [measureAction(time=time_value, target="<color>")];
+     }
+     else if (/(MeasureAction)`MEASURE OBJECT <Time? _>` := action) {
+          dt.measureAction = [measureAction(time=time_value, target="object")];
+     }
      return dt;
 }
 

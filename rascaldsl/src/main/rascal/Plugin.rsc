@@ -37,9 +37,9 @@ set[LanguageService] contribs() = {
 
 value exec(gen(Planning p)) {
     static_code = static_code_generator();
-    rVal = generator(p, static_code[0], static_code[1]);
-    outputFile = |project://rascaldsl/instance/output/output.py|; 
-    writeFile(outputFile, rVal);
+    rVal = generator(p, static_code[0], static_code[1], static_code[2]);
+    outputFile = |project://rascaldsl/instance/output/master.py|; 
+    writeFile(outputFile, rVal[0]);
     edit(outputFile);
     return ("result": true);
 }

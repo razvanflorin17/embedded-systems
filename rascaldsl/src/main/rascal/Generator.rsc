@@ -19,7 +19,7 @@ void main() {
     inFile = |project://rascaldsl/instance/spec1.tdsl|;
     cst = parsePlanning(inFile);
     static_code = static_code_generator();
-    rVal = generator(cst, static_code[0], static_code[1]);
+    rVal = generator(cst, static_code[0], static_code[1], static_code[2]);
     println(rVal);
 }
 
@@ -35,32 +35,15 @@ DefInfo findReferenceFromSrc(TModel tm, src) {
     throw "Fix references in language instance";
 }
 
-str generator(cst, str static_code, tuple[str, str] master_bhvs) { // WIP
-    tm = modulesTModelFromTree(cst);
+tuple[str, str] generator(cst, str static_code, tuple[str, str] master_bhvs, str slave_code) { // WIP
     str retVal = static_code;
-    trigger_list = [];
-    action_list = [];
+    str master_ret = "";
+    str slave_ret = "";
+
     if(/(RoverConfig) `Rover: <IDList missions> MAC: <STR mac>` := cst) {
         
-        bhv_list = extractBhvs(missions, tm);
-        tmp_ret = generateBhvsDef(bhv_list, tm);
-        bhv_def = tmp_ret[0];
-        trigger_map = tmp_ret[1];
-        action_map = tmp_ret[2];
-
-        retVal += "
-        '<mac>
-        '
-        '
-        '
-        '<bhv_def>
-        '
-        '
-        '<generateMissionsDef(missions, tm, trigger_map, action_map)>
-        '
-        '
-        '<printMissionsUsage(missions, tm, master_bhvs)>
-        '";
+        master_ret += generator_master(cst, missions, "<mac>", master_bhvs);
+        slave_ret += generator_slave("<mac>", slave_code);
 
     }
     // retValTmp = [];
@@ -68,8 +51,42 @@ str generator(cst, str static_code, tuple[str, str] master_bhvs) { // WIP
     //     retValTmp += "<printTaskList(tl)>";
     // }
 
-    
+    master_ret = retVal + master_ret;
+    slave_ret = retVal + slave_ret;
 
+
+    return <master_ret, slave_ret>;
+}
+
+str generator_slave(str master_mac, str slave_code) {
+    return "";
+}
+
+str generator_master(cst, missions, str master_mac, tuple[str, str] master_bhvs) {
+    str retVal = "";
+    trigger_list = [];
+    action_list = [];
+    tm = modulesTModelFromTree(cst);
+
+    bhv_list = extractBhvs(missions, tm);
+    tmp_ret = generateBhvsDef(bhv_list, tm);
+    bhv_def = tmp_ret[0];
+    trigger_map = tmp_ret[1];
+    action_map = tmp_ret[2];
+
+    retVal += "
+    '<master_mac>
+    '
+    '
+    '
+    '<bhv_def>
+    '
+    '
+    '<generateMissionsDef(missions, tm, trigger_map, action_map)>
+    '
+    '
+    '<printMissionsUsage(missions, tm, master_bhvs)>
+    '";
 
     return retVal;
 
@@ -188,6 +205,7 @@ str printBhvDef(states_init, states_check, bhv_str) {
     '
     '
     '\tdef action(self):
+    '\t\tglobal OVERRIDED_LAKE, MEASURE_OBJ
     '\t\tself.suppressed = False
     '\t\tself.firing = True
     '\t\tself.to_fire = False
@@ -312,6 +330,7 @@ str printMissionControllerBhvDef(list[tuple[list[value], str, str, int]] task_li
             states_init_conds += "[lambda: self.running_actions_done]";
             operations_init += printListLambda(generateActionTask(task_items));
             states_timeout += task_timeout;
+            state_cont += 1;
 
         }
     }
@@ -327,6 +346,7 @@ str printMissionControllerBhvDef(list[tuple[list[value], str, str, int]] task_li
     '\tself.counter_action = 0
     '\tself.running_actions_done = False
     '\tself.timer = 0
+    '\treturn self.executing_state \< <state_cont>
     '";
 
     timer_check = "if self.timer == 0:
@@ -346,7 +366,9 @@ str printMissionControllerBhvDef(list[tuple[list[value], str, str, int]] task_li
     '\toperation()
     '\twhile MOTOR.is_running and not self.suppressed and not TASK_REGISTRY.task_done(\"state_\" + str(self.executing_state)):
     '\t\tpass
-    '\tif not self.suppressed:
+    '\tif self.suppressed:
+    '\t\tbreak
+    '\telse:
     '\t\tself.counter_action += 1
     '
     'if not self.suppressed and self.counter_action == len(self.operations[self.executing_state]):
@@ -387,6 +409,7 @@ str printMissionControllerBhvDef(list[tuple[list[value], str, str, int]] task_li
     '\t\treturn not self.fired
     '
     '\tdef action(self):
+    '\t\tglobal OVERRIDED_LAKE, MEASURE_OBJ, MEASURE_LAKE
     '\t\tif self.timeouted:
     '\t\t\t<timeout_execution>
     '\t\tself.suppressed = False
@@ -395,8 +418,9 @@ str printMissionControllerBhvDef(list[tuple[list[value], str, str, int]] task_li
     '\t\tself.fired = False
     '\t\treturn not self.suppressed
     '
-    '\tdef _caction_dec(self):
-    '\t\tself.counter_action = -1
+    '\tdef _caction_dec(self, cond=True):
+    '\t\tif cond:
+    '\t\t\tself.counter_action = self.counter_action - 2
     '
     '\tdef suppress(self):
     '\t\tMOTOR.stop()
@@ -502,7 +526,8 @@ list[str] generateAction(DefInfo defInfo) {
         return ["set_led(LEDS, \"<toUpperCase(la.color)>\")"];
     }
     if (msa <- defInfo.measureAction) {
-        return ["ARM_MOTOR.move(up=False, rotations=1, block=True)", "time.sleep(<msa.time>)", "ARM_MOTOR.move(up=True, rotations=1, block=True)"];
+        if (msa.target == "object") return ["(MEASURE_OBJ := True)", "ARM.move(up=False, rotations=0.5, block=True)", "time.sleep(<msa.time>)", "ARM.move(up=True, rotations=0.5, block=True)", "(MEASURE_OBJ := False)"];
+        else return ["(OVERRIDED_LAKE := True)", "measure_lake(motor=MOTOR, left=READINGS_DICT[\"CS_L\"] == \"<msa.target>\", right=READINGS_DICT[\"CS_R\"] == \"<msa.target>\", mid=READINGS_DICT[\"CS_M\"] == \"<msa.target>\", sleep_time = <msa.time>, bhv=self)", "(OVERRIDED_LAKE := False)"];
     }
     return ["()"];
 }
@@ -538,10 +563,15 @@ list[str] generateActionTask(list[DefInfo] actions_defInfo) {
                 }
                 operations += ["MOTOR.odometry_start()"];
                 for (coordinates <- computeCoordinates(actions_to_compute)) {
-                    operations += ["MOTOR.to_coordinates(<coordinates[0]>, <coordinates[1]>, speed=<coordinates[2]>)"];
+                    operations += ["MOTOR.to_coordinates(<coordinates[0]>, <coordinates[1]>, speed=<coordinates[2]>, random_rep=True, bhv=self)"];
                 }
                 operations += ["MOTOR.odometry_stop()"];
             }
+        }
+        else if (msa <- actions_defInfo[i].measureAction) {
+            if (msa.target == "object") operations += ["(MEASURE_OBJ := True)", "ARM.move(up=False, rotations=0.5, block=True)", "time.sleep(<msa.time>)", "ARM.move(up=True, rotations=0.5, block=True)", "(MEASURE_OBJ := False)"];
+            else operations += ["(MEASURE_LAKE := (<msa.target>, <msa.time>))", "MOTOR.run(forward=True, distance=100, brake=False, speedM=1.3)", "self._caction_dec(cond=(not MEASURE_LAKE))"];
+            i += 1;
         }
         else {
             operations += generateAction(actions_defInfo[i]);

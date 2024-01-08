@@ -8,10 +8,10 @@ touch_back == TOUCH back
 
 notify := BEEP
 turn_360 := RIGHT 360° 15
-drive_over := FORWARD 70cm 15
+drive_over := FORWARD 70cm
 
 Behavior: notfy_white_right WHEN white_right DO notify^3
-Behavior: notify_yellow_lake WHEN [yellow_left, yellow_right, yellow_mid] DO notify
+Behavior: notify_yellow_lake WHEN ANY [yellow_left, yellow_right, yellow_mid] DO notify
 
 
 border_lake_speech := SPEAK "Starting border lake mission"

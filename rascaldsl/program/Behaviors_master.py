@@ -283,6 +283,8 @@ class LakeAvoidanceBhv(Behavior):
         """
         Behavior.__init__(self)
         self.suppressed = False
+        global MEASURE_LAKE, OVERRIDED_LAKE
+        MEASURE_LAKE, OVERRIDED_LAKE = False, False
         # self.measure = measure
         # self.last_color = None
 
@@ -300,7 +302,8 @@ class LakeAvoidanceBhv(Behavior):
         @return: True if the color sensor is on a black surface
         @rtype: bool
         """
-
+        if OVERRIDED_LAKE:
+            return False
         
         mid_color = READINGS_DICT["CS_M"]
         left_color = READINGS_DICT["CS_L"]
@@ -319,54 +322,14 @@ class LakeAvoidanceBhv(Behavior):
             
             if any([left_edge, mid_edge, right_edge]):
                 self.triggering_state = self.edge
-                # if self.measure:
-                #     timedlog(self.detected_colors)
-                #     color = next((color for color in [left_color, mid_color, right_color] if color in self.lake_colors), None)
-                #     if color is not None:
-                #         if self.detected_colors[color]:
-                #             self.operations = self._get_operations(left_edge, mid_edge, right_edge, mid_nc)
-                #         else:
-                #             self.last_color = next((c for c in self.lake_colors if not self.detected_colors[c]), None)
-                #             timedlog("LAST COLOR -----------------------")
-                #             timedlog(self.last_color)
-                #             self.operations = self._get_operations_measure(left_edge, mid_edge, right_edge, mid_nc)
-                #     else:
-                #         self.operations = self._get_operations(left_edge, mid_edge, right_edge, mid_nc)
-                # else:
-                #     self.operations = self._get_operations(left_edge, mid_edge, right_edge, mid_nc)
-                self.operations = self._get_operations(left_edge, mid_edge, right_edge, mid_nc)
+                if MEASURE_LAKE and (any([left_color == MEASURE_LAKE[0], mid_color == MEASURE_LAKE[0], right_color == MEASURE_LAKE[0]])):
+                    self.operations = get_measurement_lake_operation(left_edge, mid_edge, right_edge, MEASURE_LAKE[1]) + [lambda: (MEASURE_LAKE:=False)]
+                else:
+                    self.operations = self._get_operations(left_edge, mid_edge, right_edge, mid_nc)
                 
                 return True
 
         return False
-    
-
-    # def _get_operations_measure(self, left, mid, right, mid_nc):
-    #     if all([left, mid]):
-    #         return [lambda: MOTOR.turn(direction=LEFT, degrees=5), 
-    #                 lambda: self.arm_motor.move(up=False, block=True), lambda: self.arm_motor.move(block=True),
-    #                 lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=LEFT, degrees=40)]
-        
-    #     if all([mid, right]):
-    #         return [lambda: MOTOR.turn(direction=RIGHT, degrees=5), 
-    #                 lambda: self.arm_motor.move(up=False, block=True), lambda: self.arm_motor.move(block=True),
-    #                 lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=RIGHT, degrees=40)]
-        
-    #     if left:
-    #         return [lambda: MOTOR.turn(direction=LEFT, degrees=15), 
-    #                 lambda: self.arm_motor.move(up=False, block=True), lambda: self.arm_motor.move(block=True),
-    #                 lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=LEFT, degrees=20)]
-
-    #     if right:
-    #         return [lambda: MOTOR.turn(direction=RIGHT, degrees=15), 
-    #                 lambda: self.arm_motor.move(up=False, block=True), lambda: self.arm_motor.move(block=True),
-    #                 lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=RIGHT, degrees=20)]
-                        
-    #     if mid:
-    #         return [lambda: self.arm_motor.move(up=False, block=True), lambda: self.arm_motor.move(block=True),
-    #                 lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(degrees=40)]
-
-    #     return []
 
 
     def _get_operations(self, left, mid, right, mid_nc):
@@ -406,7 +369,7 @@ class LakeAvoidanceBhv(Behavior):
         """
         Change direction to step away from the border
         """
-
+        global MEASURE_LAKE
         self.suppressed = False
         if DEBUG:
             timedlog("Lake collision  " + str(self.triggering_state))
@@ -416,9 +379,6 @@ class LakeAvoidanceBhv(Behavior):
             operation()
             while MOTOR.is_running and not self.suppressed:
                 pass
-            # if self.last_color is not None:
-            #     self.detected_colors[self.last_color] = True
-            #     self.last_color = None
             if self.suppressed:
                 break
         
@@ -509,6 +469,9 @@ class UpdateReadings(Behavior):
         """
         Behavior.__init__(self)
         self.data = ""
+        self.prev_cs_l = None
+        self.prev_cs_m = None
+        self.prev_cs_r = None
     
     def check(self):
         """
@@ -533,9 +496,19 @@ class UpdateReadings(Behavior):
         # READINGS_DICT["TS_B"] = bool(int(data[2]))
         # READINGS_DICT["US_F"] = int(data[3])
 
-        READINGS_DICT["CS_L"] = read_color_sensor(CS_L)
-        READINGS_DICT["CS_M"] = read_color_sensor(CS_M)
-        READINGS_DICT["CS_R"] = read_color_sensor(CS_R)
+        cs_l = READINGS_DICT["CS_L"]
+        if cs_l != self.prev_cs_l:
+            self.prev_cs_l = cs_l
+            READINGS_DICT["CS_L"] = read_color_sensor(CS_L)
+        cs_m = READINGS_DICT["CS_M"]
+        if cs_m != self.prev_cs_m:
+            self.prev_cs_m = cs_m
+            READINGS_DICT["CS_M"] = read_color_sensor(CS_M)
+        cs_r = READINGS_DICT["CS_R"]
+        if cs_r != self.prev_cs_r:
+            self.prev_cs_r = cs_r
+            READINGS_DICT["CS_R"] = read_color_sensor(CS_R)
+
         READINGS_DICT["US_B"] = read_ultrasonic_sensor(US_B)
         
         timedlog("Readings: " + str(READINGS_DICT))
@@ -578,6 +551,8 @@ class AvoidCollisionBhv(Behavior):
         self.threshold_distance = threshold_distance        
         self.obj_front = False
         self.operations = []
+        global MEASURE_OBJ
+        MEASURE_OBJ = False
 
     
     def check(self):
@@ -588,7 +563,7 @@ class AvoidCollisionBhv(Behavior):
         """
         
         
-        obj_front = READINGS_DICT["ult_front"] < self.threshold_distance
+        obj_front = READINGS_DICT["ult_front"] < self.threshold_distance and not MEASURE_OBJ
 
         if obj_front != self.obj_front:
             self.obj_front = obj_front
@@ -721,3 +696,42 @@ class RecoverCollisionBhv(Behavior):
         self.suppressed = True
         if DEBUG:
             timedlog("Collision recover suppressed")
+
+
+
+def get_measurement_lake_operation(left, mid, right, sleep_time):
+    if all([left, mid]):
+        return [lambda: MOTOR.turn(direction=LEFT, degrees=5), 
+                lambda: ARM.move(up=False, block=True), lambda: time.sleep(sleep_time), lambda: ARM.move(block=True),
+                lambda: MOTOR.run(forward=False, distance=3), lambda: time.sleep(sleep_time), lambda: MOTOR.turn(direction=LEFT, degrees=40)]
+    
+    if all([mid, right]):
+        return [lambda: MOTOR.turn(direction=RIGHT, degrees=5), 
+                lambda: ARM.move(up=False, block=True), lambda: time.sleep(sleep_time), lambda: ARM.move(block=True),
+                lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=RIGHT, degrees=40)]
+    
+    if left:
+        return [lambda: MOTOR.turn(direction=LEFT, degrees=15), 
+                lambda: ARM.move(up=False, block=True), lambda: time.sleep(sleep_time), lambda: ARM.move(block=True),
+                lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=LEFT, degrees=20)]
+
+    if right:
+        return [lambda: MOTOR.turn(direction=RIGHT, degrees=15), 
+                lambda: ARM.move(up=False, block=True), lambda: time.sleep(sleep_time), lambda: ARM.move(block=True),
+                lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(direction=RIGHT, degrees=20)]
+                    
+    if mid:
+        return [lambda: ARM.move(up=False, block=True), lambda: time.sleep(sleep_time), lambda: ARM.move(block=True),
+                lambda: MOTOR.run(forward=False, distance=3), lambda: MOTOR.turn(degrees=40)]
+
+    return []
+
+
+def measure_lake(motor, left, mid, right, sleep_time, bvh):
+    operations = get_measurement_lake_operation(left, mid, right, sleep_time)
+    for operation in operations:
+        operation()
+        while motor.is_running and not bvh.suppressed:
+            pass
+        if bvh.suppressed:
+            break

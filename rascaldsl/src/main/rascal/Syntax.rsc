@@ -74,7 +74,10 @@ syntax LedAction = "LED" ColorWritable color;
 syntax ColorWritable
     = "red" | "green" | "blue" | "black" | "yellow" | "amber" | "orange";
 
-syntax MeasureAction = "MEASURE" Time? time;
+syntax MeasureAction 
+    = measureLake: "MEASURE" "LAKE" ColorReadable color Time? time
+    | measureObject: "MEASURE" "OBJECT" Time? time
+;
 
 syntax RoverTrigger
     = colorRoverTrigger: ColorTrigger colorTrigger

@@ -5,13 +5,28 @@ import List;
 import String;
 
 public int main(list[str] args=[]) {
-    inputFilePath = |project://rascaldsl/instance/static_code/input.py|;
-    outputFilePath = |project://rascaldsl/instance/static_code/output.py|;
-    outputFile = "";
-    firstLine = true;
+    master_input = |project://rascaldsl/instance/static_code/master_input.py|;
+    master_output = |project://rascaldsl/instance/static_code/master_output.py|;
+    
+    slave_input = |project://rascaldsl/instance/static_code/slave_input.py|;
+    slave_output = |project://rascaldsl/instance/static_code/slave_output.py|;
+    
+    convertFile(master_input, master_output);
+    convertFile(slave_input, slave_output);
+    return 0;
+}
 
-    assert exists(inputFilePath);
-    input = readFile(inputFilePath);
+
+void convertFile(loc inputFile, loc outputFile) {
+    assert exists(inputFile);
+    input = readFile(inputFile);
+    output = convert(input);
+    writeFile(outputFile, output);
+}
+
+str convert(str input) {
+    firstLine = true;
+    output = "";
     lines = split("\r\n", input);
     for (l <- lines) {
         l = replaceAll(l, "\"", "\\\"");
@@ -19,15 +34,12 @@ public int main(list[str] args=[]) {
         l = replaceAll(l, "\<", "\\\<");
         l = replaceAll(l, "\>", "\\\>");
         if (firstLine) {
-            outputFile += "    rVal += \"<l>\n";
+            output += "    rVal += \"<l>\n";
         } else {
-            outputFile += "            \'<l>\n";
+            output += "            \'<l>\n";
         }
         firstLine = false;
     }
-    outputFile += "            \'\";";
-
-    println(outputFile);
-    writeFile(outputFilePath, outputFile);
-    return 0;
+    output += "            \'\";";
+    return output;
 }
