@@ -288,8 +288,7 @@ class LakeAvoidanceBhv(Behavior):
         # self.measure = measure
         # self.last_color = None
 
-        self.edge = {"left": False, "mid": False, "right": False, "mid_nc": False}
-        self.triggering_state = self.edge
+        self.firing = False
         self.lake_colors = lake_colors
         self.detected_colors = {color: False for color in self.lake_colors}
         self.operations = []
@@ -314,20 +313,14 @@ class LakeAvoidanceBhv(Behavior):
         right_edge = right_color in self.lake_colors
         mid_nc = mid_color == "nocolor"
 
-        if left_edge != self.edge["left"] or mid_edge != self.edge["mid"] or right_edge != self.edge["right"] or mid_nc != self.edge["mid_nc"]:
-            self.edge["left"] = left_edge
-            self.edge["mid"] = mid_edge
-            self.edge["right"] = right_edge
-            self.edge["mid_nc"] = mid_nc
+        if not self.firing and any([left_edge, mid_edge, right_edge]):
+            self.firing = True
+            if MEASURE_LAKE and (any([left_color == MEASURE_LAKE[0], mid_color == MEASURE_LAKE[0], right_color == MEASURE_LAKE[0]])):
+                self.operations = get_measurement_lake_operation(left_edge, mid_edge, right_edge, MEASURE_LAKE[1]) + [lambda: set_global_MEASURE_LAKE(False)]
+            else:
+                self.operations = self._get_operations(left_edge, mid_edge, right_edge, mid_nc)
             
-            if any([left_edge, mid_edge, right_edge]):
-                self.triggering_state = self.edge
-                if MEASURE_LAKE and (any([left_color == MEASURE_LAKE[0], mid_color == MEASURE_LAKE[0], right_color == MEASURE_LAKE[0]])):
-                    self.operations = get_measurement_lake_operation(left_edge, mid_edge, right_edge, MEASURE_LAKE[1]) + [lambda: (MEASURE_LAKE:=False)]
-                else:
-                    self.operations = self._get_operations(left_edge, mid_edge, right_edge, mid_nc)
-                
-                return True
+            return True
 
         return False
 
@@ -361,7 +354,7 @@ class LakeAvoidanceBhv(Behavior):
         return []
 
     def _reset(self):
-        self.edge = {"left": False, "mid": False, "right": False, "mid_nc": False}
+        self.firing = False
         MOTOR.stop()
 
 
@@ -397,19 +390,22 @@ class LakeAvoidanceBhv(Behavior):
         if DEBUG:
             timedlog("Lake collision suppressed")
 
-class UpdateSlaveReadings(Behavior):
+
+class UpdateReadings(Behavior):
     """
     This simple behavior, at each check cycle, will update the slave readings without doing anything else
     """
         
    
     def __init__(self):
+        """
+        Initialize the behavior
+        @param BLUETOOTH_CONNECTION: The bluetooth connection to useù
+        @param readings_dict: The readings dictionary to update
+        
+        """
         Behavior.__init__(self)
-
         self.data = ""
-
-        self.direction = None
-
     
     def check(self):
         """
@@ -427,91 +423,17 @@ class UpdateSlaveReadings(Behavior):
     
     def _update_readings_dict(self):
         data = self.data.split(",")
-        READINGS_DICT["touch_left"] = bool(int(data[0]))
-        READINGS_DICT["touch_right"] = bool(int(data[1]))
-        READINGS_DICT["touch_back"] = bool(int(data[2]))
-        READINGS_DICT["ult_front"] = int(data[3])
-        
-
-        if DEBUG:
-            timedlog("Readings: " + str(READINGS_DICT))
-
-        # log = "Readings: " + str(READINGS_DICT['touch_left']) + "," + str(READINGS_DICT['touch_right']) + "," + str(READINGS_DICT['touch_back']) + "," + str(READINGS_DICT['ult_front'])
-        # timedlog(log)
-            
-    def action(self):
-        """
-        Do nothing
-        """
-        return True
+        READINGS_DICT["TS_L"] = bool(int(data[0]))
+        READINGS_DICT["TS_R"] = bool(int(data[1]))
+        READINGS_DICT["TS_B"] = bool(int(data[2]))
+        READINGS_DICT["US_F"] = int(data[3])
 
 
-
-    def suppress(self):
-        """
-        Suppress the behavior
-        """
-        pass
-
-
-class UpdateReadings(Behavior):
-    """
-    This simple behavior, at each check cycle, will update the slave readings without doing anything else
-    """
-        
-   
-    def __init__(self):
-        """
-        Initialize the behavior
-        @param BLUETOOTH_CONNECTION: The bluetooth connection to useù
-        @param readings_dict: The readings dictionary to update
-        
-        """
-        Behavior.__init__(self)
-        self.data = ""
-        self.prev_cs_l = None
-        self.prev_cs_m = None
-        self.prev_cs_r = None
-    
-    def check(self):
-        """
-        Check if the bluetooth connection has recived a new reading
-        @return: True if the bluetooth connection has recived a new reading
-        @rtype: bool
-        """
-
-        # data = self.BLUETOOTH_CONNECTION.get_data()
-        # if data != "":
-        #     self.data = data
-        #     self._update_readings_dict()
-
-        self._update_readings_dict()
-        
-        return False
-    
-    def _update_readings_dict(self):
-        # data = self.data.split(",")
-        # READINGS_DICT["TS_L"] = bool(int(data[0]))
-        # READINGS_DICT["TS_R"] = bool(int(data[1]))
-        # READINGS_DICT["TS_B"] = bool(int(data[2]))
-        # READINGS_DICT["US_F"] = int(data[3])
-
-        cs_l = READINGS_DICT["CS_L"]
-        if cs_l != self.prev_cs_l:
-            self.prev_cs_l = cs_l
-            READINGS_DICT["CS_L"] = read_color_sensor(CS_L)
-        cs_m = READINGS_DICT["CS_M"]
-        if cs_m != self.prev_cs_m:
-            self.prev_cs_m = cs_m
-            READINGS_DICT["CS_M"] = read_color_sensor(CS_M)
-        cs_r = READINGS_DICT["CS_R"]
-        if cs_r != self.prev_cs_r:
-            self.prev_cs_r = cs_r
-            READINGS_DICT["CS_R"] = read_color_sensor(CS_R)
-
+        READINGS_DICT["CS_L"] = read_color_sensor(CS_L)
+        READINGS_DICT["CS_M"] = read_color_sensor(CS_M)
+        READINGS_DICT["CS_R"] = read_color_sensor(CS_R)
         READINGS_DICT["US_B"] = read_ultrasonic_sensor(US_B)
         
-        timedlog("Readings: " + str(READINGS_DICT))
         # log = "Readings: " + str(READINGS_DICT['touch_left']) + "," + str(READINGS_DICT['touch_right']) + "," + str(READINGS_DICT['touch_back']) + "," + str(READINGS_DICT['ult_front'])
         # timedlog(log)
             

@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+
+    rVal += "#!/usr/bin/env python3
 
 import random
 
@@ -16,11 +17,11 @@ if DEBUG:
 TS_L, TS_R, TS_B, US_F, LEFT, RIGHT = INPUT_1, INPUT_2, INPUT_3, INPUT_4, -1, 1
 
 TS_L, TS_R, TS_B, US_F, S = TouchSensor(TS_L), TouchSensor(TS_R), TouchSensor(TS_B), UltrasonicSensor(US_F), Sound()
-US_F.mode = 'US-DIST-CM'
+US_F.mode = \'US-DIST-CM\'
 
 
 BLUETOOTH_CONNECTION = BluetoothConnection(MASTER, MASTER_MAC, debug=DEBUG)
-READINGS_DICT = {"TS_L": False, "TS_R": False, "TS_B": False, "US_F": 0}
+READINGS_DICT = {\"TS_L\": False, \"TS_R\": False, \"TS_B\": False, \"US_F\": 0}
 
 
 
@@ -45,12 +46,12 @@ from commons import *
 
 
 class UpdateSlaveReadingsBhv(Behavior):
-    """
+    \"\"\"
     This behavior will check if the robot touch an object, and tries to step away from it
-    """
+    \"\"\"
     
     def __init__(self):
-        """
+        \"\"\"
         Initialize the behavior
         @param touch_left: The left touch sensor to use
         @param touch_right: The right touch sensor to use
@@ -59,33 +60,33 @@ class UpdateSlaveReadingsBhv(Behavior):
         @param bluetooth_connection: The bluetooth connection to use
         @param readings_dict: The readings dictionary to update and send
         
-        """
+        \"\"\"
         Behavior.__init__(self)
 
         self.direction = None
 
     
     def check(self):
-        """
+        \"\"\"
         Check if the touch sensor is pressed
         @return: True if the touch sensor is pressed
         @rtype: bool
-        """
+        \"\"\"
         return True
         
 
     def action(self):
-        """
+        \"\"\"
         Update the dictionary with the new readings and send them to the master
-        """
+        \"\"\"
 
-        READINGS_DICT["TS_L"] = read_touch_sensor(TL)
-        READINGS_DICT["TS_R"] = read_touch_sensor(TR)
-        READINGS_DICT["TS_B"] = read_touch_sensor(TB)
-        READINGS_DICT["US_F"] = read_ultrasonic_sensor(US_F)
+        READINGS_DICT[\"TS_L\"] = read_touch_sensor(TL)
+        READINGS_DICT[\"TS_R\"] = read_touch_sensor(TR)
+        READINGS_DICT[\"TS_B\"] = read_touch_sensor(TB)
+        READINGS_DICT[\"US_F\"] = read_ultrasonic_sensor(US_F)
 
-        msg = str(READINGS_DICT['TS_L']) + "," + str(READINGS_DICT['TS_R']) + "," + str(READINGS_DICT['TS_B']) + "," + str(READINGS_DICT['US_F'])
-        log = "Sending Readings: " + msg
+        msg = str(READINGS_DICT[\'TS_L\']) + \",\" + str(READINGS_DICT[\'TS_R\']) + \",\" + str(READINGS_DICT[\'TS_B\']) + \",\" + str(READINGS_DICT[\'US_F\'])
+        log = \"Sending Readings: \" + msg
         if DEBUG:
             timedlog(log)
         BLUETOOTH_CONNECTION.write(msg)
@@ -96,7 +97,9 @@ class UpdateSlaveReadingsBhv(Behavior):
 
 
     def suppress(self):
-        """
+        \"\"\"
         Suppress the behavior
-        """
+        \"\"\"
         pass
+
+            '";

@@ -512,6 +512,31 @@ Task collectTask(Collector c, task_in) {
 // mission
 
 //definitions
+
+// 1 task, 0 bh
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <Task task> <MissionFeedback? missionFeedback>`,  Collector c) {
+     task_res = collectTask(c, task);
+
+     dt = defType(missionType());
+     dt.mission = [mission(taskList=[task_res], behaviorList=[], feedbacks=collectFeedbacks(c, missionFeedback))];
+     c.define("<idNew>", missionId(), idNew, dt);
+}
+
+
+// n task, 0 bhv
+void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <TaskList tasks> <MissionFeedback? missionFeedback>`,  Collector c) {
+
+     taskList_res = [];
+     for (task_in <- [task_in |/(Task) `<Task task_in>` := tasks]) {
+          taskList_res += collectTask(c, task_in);
+     } 
+
+     dt = defType(missionType());
+     dt.mission = [mission(taskList=taskList_res, behaviorList=[], feedbacks=collectFeedbacks(c, missionFeedback))];
+     c.define("<idNew>", missionId(), idNew, dt);
+}
+
+
 // 1 task, 1 bhv
 void collect(current: (Mission)`Mission: <ID idNew> EXECUTE <Task task> WHILE <ID idBhv> <MissionFeedback? missionFeedback>`,  Collector c) {
      task_res = collectTask(c, task);

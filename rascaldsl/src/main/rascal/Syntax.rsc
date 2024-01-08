@@ -14,7 +14,7 @@ syntax RoverConfig  //W.I.P.
     = new: "Rover:" IDList missions "MAC:" STR macAddress 
 ;
 
-syntax Mission = "Mission:" ID id "EXECUTE" (Task | TaskList) tasks "WHILE" (ID | IDList) behaviors MissionFeedback? missionFeedback;
+syntax Mission = "Mission:" ID id "EXECUTE" (Task | TaskList) tasks ("WHILE" (ID | IDList) behaviors)? MissionFeedback? missionFeedback;
 
 syntax Behavior
     = newSingleTrigger: "Behavior:" ID id "WHEN" ID trigger "DO" (ID | IDList) action
@@ -86,7 +86,7 @@ syntax RoverTrigger
 ;
 
 syntax ColorTrigger = "COLOR" ColorSensor colorSensor ColorReadable color;
-syntax ColorSensor = "left" | "right" | "mid";
+syntax ColorSensor = "left" | "right" | "mid" | "any";
 syntax ColorReadable = "black" | "blue" | "yellow" | "red" | "white";
 
 syntax DistanceTrigger = "INDISTANCE" DistanceSensor distanceSensor Distance distanceThreshold;

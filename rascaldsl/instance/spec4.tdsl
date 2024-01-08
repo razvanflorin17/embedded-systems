@@ -1,0 +1,14 @@
+red_sensor == COLOR any red
+yellow_sensor == COLOR any yellow
+blue_sensor == COLOR any blue
+
+border_lake_speech := SPEAK "Starting find lake mission"
+over_lake_speech := SPEAK "Every lake founded"
+timeout := SPEAK "Timeout"
+
+find_object == TOUCH any
+measure_obj := MEASURE OBJECT
+
+Mission: find_lakes EXECUTE [{ANY [red_sensor, yellow_sensor, blue_sensor]}, {find_object}, measure_obj ] FEEDBACKS: {START [border_lake_speech], END [over_lake_speech], TIMEOUT timeout^3}
+
+Rover: [find_lakes] MAC: "00:17:E9:B2:1E:41"
